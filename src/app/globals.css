@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html,
+body {
+  background: #0b0d10;
+  color: #eef1f4;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a323b;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a444f;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-faso-line bg-faso-panel/70 p-4;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-faso-red text-white hover:bg-faso-red/90;
+  }
+  .btn-ghost {
+    @apply btn border border-faso-line bg-white/5 text-white hover:bg-white/10;
+  }
+  .input {
+    @apply w-full rounded-lg border border-faso-line bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-faso-gold/70;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-white/50;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-faso-line bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/70;
+  }
+  .section-title {
+    @apply text-lg font-bold text-white sm:text-xl;
+  }
+}
+
+/* Curseurs (volume, crossfader, pitch) : meme rendu sur tous les navigateurs. */
+input[type="range"] {
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15;
+}
+input[type="range"]::-webkit-slider-thumb {
+  @apply h-3.5 w-3.5 appearance-none rounded-full bg-faso-gold shadow;
+}
+input[type="range"]::-moz-range-thumb {
+  @apply h-3.5 w-3.5 rounded-full border-0 bg-faso-gold;
+}
+/* Curseur vertical (volume de platine) : hauteur fixe, sinon le champ
+   s'etire a toute la colonne et deforme la platine. */
+input[type="range"].vertical {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 6px;
+  height: 8rem;
+}
+
+.marquee-text {
+  animation: marquee 12s linear infinite;
+}
+@keyframes marquee {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  85%,
+  100% {
+    transform: translateX(calc(-100% + 180px));
+  }
+}
