@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canDownload, canStream, canUseInDj, ownsTrack } from "@/lib/permissions";
+import {
+  canDownload,
+  canStream,
+  canUseInDj,
+  estPayant,
+  ownsTrack,
+  peutTelecharger,
+} from "@/lib/permissions";
 
 /** Ligne de morceau telle qu'elle sort de la base. */
 function track(overrides = {}) {
@@ -10,6 +17,7 @@ function track(overrides = {}) {
     allow_stream: 1,
     allow_download: 0,
     allow_dj: 0,
+    price_cfa: 0,
     ...overrides,
   };
 }
@@ -44,6 +52,40 @@ test("seul l'artiste proprietaire, ou un administrateur, possede le morceau", ()
   assert.equal(ownsTrack({ role: "admin" }, morceau), true);
   assert.equal(ownsTrack(null, morceau), false);
   assert.equal(ownsTrack({ role: "auditeur" }, morceau), false);
+});
+
+test("un titre est payant seulement si l'artiste l'autorise et fixe un prix", () => {
+  assert.equal(estPayant(track({ price_cfa: 500 })), false, "sans autorisation, rien n'est vendu");
+  assert.equal(estPayant(track({ allow_download: 1, price_cfa: 0 })), false);
+  assert.equal(estPayant(track({ allow_download: 1, price_cfa: 500 })), true);
+});
+
+test("un telechargement gratuit ne demande aucun paiement", () => {
+  const gratuit = track({ allow_download: 1 });
+  assert.equal(peutTelecharger(gratuit), true);
+  assert.equal(peutTelecharger(gratuit, { dejaPaye: false }), true);
+});
+
+test("un telechargement payant exige un paiement abouti", () => {
+  const payant = track({ allow_download: 1, price_cfa: 500 });
+  assert.equal(peutTelecharger(payant), false);
+  assert.equal(peutTelecharger(payant, { dejaPaye: true }), true);
+});
+
+test("l'artiste telecharge ses propres titres payants", () => {
+  const payant = track({ allow_download: 1, price_cfa: 500 });
+  assert.equal(peutTelecharger(payant, { user: { role: "artiste", artistId: "art_1" } }), true);
+  assert.equal(peutTelecharger(payant, { user: { role: "artiste", artistId: "art_2" } }), false);
+  assert.equal(peutTelecharger(payant, { user: { role: "admin" } }), true);
+});
+
+test("payer ne contourne pas le refus de l'artiste", () => {
+  // Le titre a ete achete, puis l'artiste a ferme le telechargement.
+  const ferme = track({ allow_download: 0, price_cfa: 500 });
+  assert.equal(peutTelecharger(ferme, { dejaPaye: true }), false);
+
+  const retire = track({ allow_download: 1, price_cfa: 500, allow_stream: 0 });
+  assert.equal(peutTelecharger(retire, { dejaPaye: true }), false);
 });
 
 test("un auditeur sans fiche artiste ne possede rien", () => {

@@ -98,6 +98,7 @@ export async function POST(request) {
     allowDownload: bool("allowDownload"),
     allowDj: bool("allowDj"),
     license: form.get("license") || undefined,
+    priceCfa: Number(form.get("priceCfa")) || 0,
     rightsConfirmed: true,
     published: form.get("published") !== "false",
   });

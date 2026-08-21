@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/auth";
 import { getTrackRow, recordEvent } from "@/lib/repo/tracks";
-import { canDownload } from "@/lib/permissions";
+import { canDownload, estPayant, peutTelecharger } from "@/lib/permissions";
+import { aAchete } from "@/lib/repo/payments";
 import { extensionFor, mediaStats } from "@/lib/storage";
 import { fail, isFirstRequest, rangeResponse } from "@/lib/http";
 
@@ -19,6 +20,16 @@ export async function GET(request, { params }) {
     return fail("L'artiste n'autorise pas le telechargement de ce titre.", 403);
   }
 
+  // Le paiement se verifie ici, pas dans l'interface : le lien direct ne doit
+  // pas suffire a contourner l'achat.
+  const user = await currentUser();
+  if (estPayant(row) && !peutTelecharger(row, { user, dejaPaye: aAchete(user?.id, row.id) })) {
+    return fail(
+      `Ce titre est vendu ${row.price_cfa} F CFA par l'artiste. Reglez-le pour le telecharger.`,
+      402,
+    );
+  }
+
   let media;
   try {
     media = mediaStats(row.media_path);
@@ -28,7 +39,6 @@ export async function GET(request, { params }) {
 
   const range = request.headers.get("range");
   if (isFirstRequest(range)) {
-    const user = await currentUser();
     recordEvent(row.id, "download", user?.id || null);
   }
 

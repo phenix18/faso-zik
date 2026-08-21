@@ -1,16 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { HiPlay, HiQueueList } from "react-icons/hi2";
+import { HiPlay, HiQueueList, HiShoppingBag } from "react-icons/hi2";
 import toast from "react-hot-toast";
 import { enqueue, playTrack } from "@/redux/features/playerSlice";
 import DownloadButton from "@/components/DownloadButton";
 import FavouriteButton from "@/components/FavouriteButton";
+import PaiementForm from "@/components/PaiementForm";
+import { formatCfa } from "@/lib/format";
 
 export default function TrackDetailActions({ track }) {
   const dispatch = useDispatch();
+  const [achatOuvert, setAchatOuvert] = useState(false);
+  const payant = track.permissions.downloadPaid;
 
   return (
+    <>
     <div className="mt-5 flex flex-wrap items-center gap-3">
       <button
         type="button"
@@ -32,8 +38,21 @@ export default function TrackDetailActions({ track }) {
         <HiQueueList className="text-lg" /> File d&apos;attente
       </button>
 
-      <DownloadButton track={track} withLabel className="btn-ghost" />
+      {payant ? (
+        <button type="button" onClick={() => setAchatOuvert((ouvert) => !ouvert)} className="btn-ghost">
+          <HiShoppingBag className="text-lg" /> Acheter {formatCfa(track.priceCfa)}
+        </button>
+      ) : (
+        <DownloadButton track={track} withLabel className="btn-ghost" />
+      )}
       <FavouriteButton trackId={track.id} className="text-2xl" />
     </div>
+
+    {payant && achatOuvert && (
+      <div className="mt-4 rounded-xl border border-faso-line bg-black/40 p-4">
+        <PaiementForm type="achat" track={track} onClose={() => setAchatOuvert(false)} />
+      </div>
+    )}
+    </>
   );
 }

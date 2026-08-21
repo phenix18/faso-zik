@@ -20,8 +20,9 @@ complet et **platine DJ deux voies** integree au navigateur.
 | **Bibliotheque** | Favoris et playlists par compte |
 | **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable |
 | **Droits** | Declaration obligatoire du deposant, page publique de procedure de retrait, limitation de debit sur inscription, connexion et depot |
+| **Paiement** | Achat d'un titre et soutien libre a un artiste par mobile money (Orange Money, Moov Money, Wave), revenus et part du site dans le studio |
 | **Reseau lent** | Transcodage a l'arrivee : MP3 128 kbit/s pour l'ecoute, clips decoupes en HLS 360p/720p, mode economie de donnees, application installable qui s'ouvre hors connexion |
-| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 60 tests |
+| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 77 tests |
 
 ---
 
@@ -80,7 +81,7 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 60 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage |
+| `npm test` | 77 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, paiements |
 | `npm run seed` | jeu de demonstration (idempotent) |
 | `npm run backup` | sauvegarde de la base et des medias |
 | `npm run db:reset` | efface base et medias locaux |
@@ -209,6 +210,37 @@ un volume). Derriere plusieurs instances, remplacer la `Map` de
 
 ---
 
+## Paiement mobile money
+
+Au Burkina Faso l'argent circule par Orange Money, Moov Money et les
+portefeuilles voisins. L'application ne parle jamais a un operateur en direct :
+elle passe par un fournisseur choisi dans `PAIEMENT_FOURNISSEUR`, qui expose
+quatre operations (`src/lib/paiement/`).
+
+Deux usages : **acheter le telechargement** d'un titre au prix fixe par
+l'artiste, et **soutenir un artiste** par un pourboire libre depuis sa page. Le
+studio affiche l'encaisse, la part du site et le net a reverser.
+
+Trois regles tenues cote serveur :
+
+- le montant d'un achat vient du prix enregistre, jamais du navigateur ;
+- `/api/download` renvoie `402` tant que l'achat n'est pas conclu, meme si le
+  lien est devine ou partage ;
+- un paiement deja conclu n'est jamais rejoue : les notifications d'un
+  agregateur arrivent parfois en double ou dans le desordre.
+
+`simulation` est le fournisseur par defaut : il rejoue le cycle complet — y
+compris les echecs — sans compte marchand, ce qui rend la chaine testable de
+bout en bout. Dans ce mode, la route de notification est **fermee** : sans
+verification de signature, elle laisserait n'importe qui se declarer paye.
+
+`agregateur` est une **ossature, pas une integration validee**. Les noms de
+champs et la methode de signature different d'un prestataire a l'autre et
+changent avec le temps. Confrontez `src/lib/paiement/agregateur.js` a la
+documentation en vigueur et testez en bac a sable avant de basculer.
+
+---
+
 ## Verifications effectuees
 
 Build de production, puis parcours reels contre le serveur demarre :
@@ -242,7 +274,13 @@ Build de production, puis parcours reels contre le serveur demarre :
   le Chromium de test est une version sans H.264 ni AAC. C'est ce qui a permis
   de verifier le repli automatique vers le fichier complet ;
 - application installable : service worker actif, manifeste complet, coquille
-  en cache, page de secours affichee reseau coupe.
+  en cache, page de secours affichee reseau coupe ;
+- parcours d'achat complet : `402` avant paiement, paiement ouvert puis
+  confirme, `200` apres, second achat refuse, un autre auditeur toujours
+  bloque ; pourboire encaisse, revenus et commission justes ;
+- notifications de paiement : refusees sans signature, avec une signature
+  erronee, et avec un corps modifie apres signature ; refusees aussi tant que
+  le fournisseur est celui de simulation.
 
 ---
 

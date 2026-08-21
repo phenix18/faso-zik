@@ -5,6 +5,7 @@ import { listTracks } from "@/lib/repo/tracks";
 import TrackList from "@/components/TrackList";
 import TrackGrid from "@/components/TrackGrid";
 import SectionHeader from "@/components/SectionHeader";
+import SoutenirArtiste from "@/components/SoutenirArtiste";
 import { formatCount } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export default function ArtistPage({ params }) {
             <span className="chip">{formatCount(stats.downloads)} telechargements</span>
             <span className="chip">{stats.downloadable} titre(s) telechargeable(s)</span>
           </div>
+          <SoutenirArtiste artist={{ id: artist.id, name: artist.name }} />
         </div>
       </header>
 

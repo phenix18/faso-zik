@@ -145,16 +145,30 @@ export default function UploadForm({ onPublished }) {
         <textarea id="description" name="description" rows={3} className="input" />
       </div>
 
-      <div>
-        <label className="label" htmlFor="license">
-          Licence declaree
-        </label>
-        <input
-          id="license"
-          name="license"
-          defaultValue="Tous droits reserves"
-          className="input max-w-sm"
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor="license">
+            Licence declaree
+          </label>
+          <input id="license" name="license" defaultValue="Tous droits reserves" className="input" />
+        </div>
+        <div>
+          <label className="label" htmlFor="priceCfa">
+            Prix du telechargement (F CFA)
+          </label>
+          <input
+            id="priceCfa"
+            name="priceCfa"
+            type="number"
+            min="0"
+            step="100"
+            defaultValue="0"
+            className="input"
+          />
+          <p className="mt-1 text-[11px] text-white/35">
+            Zero rend le telechargement gratuit, si vous l&apos;autorisez ci-dessous.
+          </p>
+        </div>
       </div>
 
       <fieldset className="rounded-lg border border-faso-red/40 bg-faso-red/5 p-4">

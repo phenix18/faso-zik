@@ -67,7 +67,12 @@ test("un auditeur promu artiste recoit une fiche, sans doublon", () => {
 
 test("un nouveau depot n'est ni telechargeable ni ouvert aux DJ", () => {
   const morceau = deposer("Faso Denya");
-  assert.deepEqual(morceau.permissions, { stream: true, download: false, dj: false });
+  assert.deepEqual(morceau.permissions, {
+    stream: true,
+    download: false,
+    dj: false,
+    downloadPaid: false,
+  });
   assert.equal(morceau.downloadUrl, null, "aucune adresse de telechargement n'est exposee");
   assert.equal(morceau.streamUrl, `/api/stream/${morceau.id}`);
 });
@@ -94,6 +99,19 @@ test("ouvrir le telechargement expose l'adresse correspondante", () => {
 
   const referme = updateTrack(morceau.id, { allowDownload: false });
   assert.equal(referme.downloadUrl, null);
+});
+
+test("un titre payant n'expose pas de lien de telechargement direct", () => {
+  const morceau = deposer("A vendre", { allowDownload: true, priceCfa: 500 });
+  assert.equal(morceau.priceCfa, 500);
+  assert.equal(morceau.permissions.download, true);
+  assert.equal(morceau.permissions.downloadPaid, true);
+  assert.equal(morceau.downloadUrl, null, "le lien direct passerait outre le paiement");
+
+  // Ramene a la gratuite, le lien reapparait.
+  const gratuit = updateTrack(morceau.id, { priceCfa: 0 });
+  assert.equal(gratuit.permissions.downloadPaid, false);
+  assert.equal(gratuit.downloadUrl, `/api/download/${morceau.id}`);
 });
 
 test("un titre depublie sort des listes publiques", () => {

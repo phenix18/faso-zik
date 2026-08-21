@@ -16,6 +16,9 @@ const patchSchema = z.object({
   bpm: z.number().min(30).max(300).nullable().optional(),
   musicKey: z.string().max(10).optional(),
   license: z.string().max(160).optional(),
+  // Prix du telechargement en francs CFA ; plafonne pour eviter une faute de
+  // frappe qui rendrait un titre inachetable.
+  priceCfa: z.number().int().min(0).max(500000).optional(),
   allowStream: z.boolean().optional(),
   allowDownload: z.boolean().optional(),
   allowDj: z.boolean().optional(),

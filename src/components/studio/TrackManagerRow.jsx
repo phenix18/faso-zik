@@ -21,6 +21,7 @@ const SWITCHES = [
 
 export default function TrackManagerRow({ track, onChange, onDelete }) {
   const [pending, setPending] = useState(null);
+  const [prix, setPrix] = useState(track.priceCfa);
 
   const values = {
     published: track.published,
@@ -41,6 +42,30 @@ export default function TrackManagerRow({ track, onChange, onDelete }) {
       onChange(data.track);
     } catch (error) {
       toast.error(error.message || "Modification impossible.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  /** Prix du telechargement ; zero rend le titre gratuit. */
+  async function enregistrerPrix() {
+    const valeur = Math.max(0, Math.round(Number(prix) || 0));
+    if (valeur === track.priceCfa) return;
+
+    setPending("prix");
+    try {
+      const response = await fetch(`/api/tracks/${track.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceCfa: valeur }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      onChange(data.track);
+      toast.success(valeur ? `Prix fixe a ${valeur} F CFA.` : "Titre rendu gratuit.");
+    } catch (error) {
+      setPrix(track.priceCfa);
+      toast.error(error.message || "Prix non enregistre.");
     } finally {
       setPending(null);
     }
@@ -99,6 +124,24 @@ export default function TrackManagerRow({ track, onChange, onDelete }) {
             <span className="text-xs font-medium text-white/70">{label}</span>
           </label>
         ))}
+
+        <label
+          className="flex items-center gap-1.5"
+          title="Prix du telechargement. Zero = gratuit."
+        >
+          <input
+            type="number"
+            min={0}
+            step={100}
+            value={prix}
+            disabled={!values.allowDownload || pending === "prix"}
+            onChange={(evenement) => setPrix(evenement.target.value)}
+            onBlur={enregistrerPrix}
+            aria-label={`Prix de ${track.title} en francs CFA`}
+            className="input w-24 !py-1 text-xs disabled:opacity-40"
+          />
+          <span className="text-[11px] text-white/45">F CFA</span>
+        </label>
 
         <button
           type="button"

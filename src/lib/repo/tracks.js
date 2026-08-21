@@ -29,6 +29,9 @@ export function toPublicTrack(row) {
     mime: row.media_mime,
     size: row.media_size,
     license: row.license,
+    // Prix du telechargement en francs CFA ; zero = gratuit si l'artiste
+    // l'autorise.
+    priceCfa: row.price_cfa || 0,
     rightsConfirmed: !!row.rights_confirmed,
     published: !!row.published,
     // "absent" : rien a faire ou ffmpeg indisponible ; "attente" / "encours" :
@@ -45,6 +48,8 @@ export function toPublicTrack(row) {
       stream: !!row.allow_stream,
       download: !!row.allow_download,
       dj: !!row.allow_dj,
+      // L'artiste autorise le telechargement, mais contre paiement.
+      downloadPaid: !!row.allow_download && (row.price_cfa || 0) > 0,
     },
     artist: {
       id: row.artist_id,
@@ -57,7 +62,9 @@ export function toPublicTrack(row) {
     // Present seulement pour un clip decoupe : le lecteur le prefere alors au
     // fichier complet.
     hlsUrl: row.hls_path ? `/api/hls/${row.id}/master.m3u8` : null,
-    downloadUrl: row.allow_download ? `/api/download/${row.id}` : null,
+    // Le lien n'apparait que pour un telechargement gratuit ; un titre payant
+    // passe d'abord par la page de paiement.
+    downloadUrl: row.allow_download && !(row.price_cfa || 0) ? `/api/download/${row.id}` : null,
   };
 }
 
@@ -151,8 +158,9 @@ export function createTrack(data) {
     `INSERT INTO tracks (
         id, artist_id, title, slug, kind, genre, language, description,
         duration, bpm, music_key, cover_url, media_path, media_mime, media_size,
-        allow_stream, allow_download, allow_dj, license, rights_confirmed, published
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        allow_stream, allow_download, allow_dj, license, rights_confirmed, published,
+        price_cfa
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     id,
     data.artistId,
@@ -175,6 +183,7 @@ export function createTrack(data) {
     data.license || "Tous droits reserves",
     data.rightsConfirmed ? 1 : 0,
     data.published === false ? 0 : 1,
+    Math.max(0, Math.round(Number(data.priceCfa) || 0)),
   );
   return getTrack(id);
 }
@@ -192,6 +201,7 @@ export function updateTrack(id, fields) {
     bpm: "bpm",
     musicKey: "music_key",
     coverUrl: "cover_url",
+    priceCfa: "price_cfa",
     license: "license",
     allowStream: "allow_stream",
     allowDownload: "allow_download",

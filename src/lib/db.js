@@ -97,6 +97,25 @@ function migrate(database) {
       PRIMARY KEY (user_id, track_id)
     );
 
+    CREATE TABLE IF NOT EXISTS payments (
+      id           TEXT PRIMARY KEY,
+      -- Reference publique, celle qui apparait dans les URL et les recus.
+      reference    TEXT NOT NULL UNIQUE,
+      user_id      TEXT REFERENCES users(id) ON DELETE SET NULL,
+      artist_id    TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+      track_id     TEXT REFERENCES tracks(id) ON DELETE SET NULL,
+      type         TEXT NOT NULL,
+      amount_cfa   INTEGER NOT NULL,
+      operator     TEXT NOT NULL,
+      phone        TEXT NOT NULL,
+      status       TEXT NOT NULL DEFAULT 'attente',
+      provider     TEXT NOT NULL,
+      provider_ref TEXT,
+      message      TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      paid_at      TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS events (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       track_id   TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
@@ -109,6 +128,8 @@ function migrate(database) {
     CREATE INDEX IF NOT EXISTS idx_tracks_kind    ON tracks(kind, published);
     CREATE INDEX IF NOT EXISTS idx_tracks_created ON tracks(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_events_track   ON events(track_id, type);
+    CREATE INDEX IF NOT EXISTS idx_payments_artist ON payments(artist_id, status);
+    CREATE INDEX IF NOT EXISTS idx_payments_achat  ON payments(user_id, track_id, status);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tracks_slug ON tracks(artist_id, slug);
   `);
 
@@ -122,6 +143,9 @@ function migrate(database) {
   ensureColumn(database, "tracks", "preview_size", "INTEGER");
   ensureColumn(database, "tracks", "hls_path", "TEXT");
   ensureColumn(database, "tracks", "transcode_status", "TEXT NOT NULL DEFAULT 'absent'");
+
+  // Prix du telechargement, en francs CFA. Zero signifie gratuit.
+  ensureColumn(database, "tracks", "price_cfa", "INTEGER NOT NULL DEFAULT 0");
 }
 
 function ensureColumn(database, table, column, definition) {

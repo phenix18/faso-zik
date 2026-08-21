@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { artistStats, getArtistByUserId, updateArtist } from "@/lib/repo/artists";
 import { promoteToArtist } from "@/lib/repo/users";
 import { listTracks } from "@/lib/repo/tracks";
+import { paiementsArtiste, revenusArtiste } from "@/lib/repo/payments";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -20,6 +21,8 @@ export async function GET() {
     artist,
     tracks: listTracks({ artistId: artist.id, includeUnpublished: true, limit: 200 }),
     stats: artistStats(artist.id),
+    revenus: revenusArtiste(artist.id),
+    paiements: paiementsArtiste(artist.id, 30),
   });
 }
 

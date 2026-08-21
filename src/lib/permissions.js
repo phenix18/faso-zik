@@ -15,6 +15,25 @@ export function canDownload(track) {
   return canStream(track) && !!track.allow_download;
 }
 
+/** L'artiste demande-t-il un paiement pour ce telechargement ? */
+export function estPayant(track) {
+  return canDownload(track) && (track.price_cfa || 0) > 0;
+}
+
+/**
+ * Droit effectif de telecharger, une fois le paiement pris en compte.
+ *
+ * `dejaPaye` est calcule par l'appelant, qui seul dispose de la base : cette
+ * fonction reste ainsi pure et testable.
+ */
+export function peutTelecharger(track, { user = null, dejaPaye = false } = {}) {
+  if (!canDownload(track)) return false;
+  if (!estPayant(track)) return true;
+  // L'artiste telecharge toujours ses propres titres.
+  if (ownsTrack(user, track)) return true;
+  return dejaPaye;
+}
+
 export function canUseInDj(track) {
   return canStream(track) && !!track.allow_dj;
 }
