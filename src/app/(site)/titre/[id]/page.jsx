@@ -103,6 +103,16 @@ export default function TrackPage({ params }) {
             {track.artist.verified && <HiCheckBadge className="text-faso-gold" />}
           </Link>
 
+          {track.album && (
+            <Link
+              href={`/artistes/${track.artist.slug}/${track.album.slug}`}
+              className="mt-1 block text-xs text-white/45 hover:text-faso-gold"
+            >
+              Extrait de « {track.album.title} »
+              {track.album.trackNo ? ` — piste ${track.album.trackNo}` : ""}
+            </Link>
+          )}
+
           <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
             {track.genre && <span className="chip">{track.genre}</span>}
             {track.language && <span className="chip">{track.language}</span>}

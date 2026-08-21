@@ -10,6 +10,7 @@ import FavouriteButton from "@/components/FavouriteButton";
 import PaiementForm from "@/components/PaiementForm";
 import BoutonIntegrer from "@/components/BoutonIntegrer";
 import AjouterAPlaylist from "@/components/AjouterAPlaylist";
+import BoutonPartager from "@/components/BoutonPartager";
 import { formatCfa } from "@/lib/format";
 
 export default function TrackDetailActions({ track }) {
@@ -47,6 +48,10 @@ export default function TrackDetailActions({ track }) {
       ) : (
         <DownloadButton track={track} withLabel className="btn-ghost" />
       )}
+      <BoutonPartager
+        titre={`${track.title} — ${track.artist.name}`}
+        texte={`Ecoutez ${track.title} de ${track.artist.name} sur FASO-ZIK`}
+      />
       {track.kind === "audio" && <BoutonIntegrer trackId={track.id} />}
       <AjouterAPlaylist trackId={track.id} className="text-2xl" />
       <FavouriteButton trackId={track.id} className="text-2xl" />

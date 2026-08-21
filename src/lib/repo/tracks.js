@@ -6,9 +6,13 @@ const SELECT_TRACK = `
          a.name  AS artist_name,
          a.slug  AS artist_slug,
          a.photo_url AS artist_photo,
-         a.verified  AS artist_verified
+         a.verified  AS artist_verified,
+         al.title AS album_title,
+         al.slug  AS album_slug,
+         al.cover_url AS album_cover
     FROM tracks t
     JOIN artists a ON a.id = t.artist_id
+    LEFT JOIN albums al ON al.id = t.album_id
 `;
 
 /** Forme envoyee au navigateur : jamais le chemin disque du fichier source. */
@@ -25,7 +29,12 @@ export function toPublicTrack(row) {
     duration: row.duration,
     bpm: row.bpm,
     musicKey: row.music_key,
-    coverUrl: row.cover_url,
+    // A defaut de pochette propre, celle de l'album : un titre isole dans une
+    // liste d'album ne doit pas jurer avec ses voisins.
+    coverUrl: row.cover_url || row.album_cover || null,
+    album: row.album_id
+      ? { id: row.album_id, title: row.album_title, slug: row.album_slug, trackNo: row.track_no }
+      : null,
     mime: row.media_mime,
     size: row.media_size,
     license: row.license,
@@ -80,6 +89,7 @@ export function listTracks({
   kind,
   artistId,
   artistSlug,
+  albumId,
   genre,
   search = "",
   sort = "recent",
@@ -102,6 +112,10 @@ export function listTracks({
   if (artistSlug) {
     where.push("a.slug = ?");
     params.push(artistSlug);
+  }
+  if (albumId) {
+    where.push("t.album_id = ?");
+    params.push(albumId);
   }
   if (genre) {
     where.push("LOWER(t.genre) = LOWER(?)");
@@ -159,8 +173,8 @@ export function createTrack(data) {
         id, artist_id, title, slug, kind, genre, language, description,
         duration, bpm, music_key, cover_url, media_path, media_mime, media_size,
         allow_stream, allow_download, allow_dj, license, rights_confirmed, published,
-        price_cfa
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        price_cfa, album_id, track_no
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     id,
     data.artistId,
@@ -184,6 +198,8 @@ export function createTrack(data) {
     data.rightsConfirmed ? 1 : 0,
     data.published === false ? 0 : 1,
     Math.max(0, Math.round(Number(data.priceCfa) || 0)),
+    data.albumId || null,
+    data.trackNo || null,
   );
   return getTrack(id);
 }
@@ -202,6 +218,8 @@ export function updateTrack(id, fields) {
     musicKey: "music_key",
     coverUrl: "cover_url",
     priceCfa: "price_cfa",
+    albumId: "album_id",
+    trackNo: "track_no",
     license: "license",
     allowStream: "allow_stream",
     allowDownload: "allow_download",

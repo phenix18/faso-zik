@@ -4,6 +4,7 @@ import { getArtistByUserId } from "@/lib/repo/artists";
 import { createTrack } from "@/lib/repo/tracks";
 import { MEDIA_ROOT, removeMedia, saveUpload } from "@/lib/storage";
 import { planifierTranscodage } from "@/lib/transcodeQueue";
+import { albumParId } from "@/lib/repo/albums";
 import { fail, json } from "@/lib/http";
 import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 
@@ -81,8 +82,14 @@ export async function POST(request) {
   const meta = await readMetadata(saved.relativePath);
   const bool = (name) => form.get(name) === "true" || form.get(name) === "on";
 
+  // Un album ne peut recevoir un titre que s'il appartient au meme artiste.
+  const albumDemande = form.get("albumId") ? albumParId(String(form.get("albumId"))) : null;
+  const album = albumDemande?.artist_id === artist.id ? albumDemande : null;
+
   const track = createTrack({
     artistId: artist.id,
+    albumId: album?.id || null,
+    trackNo: album && form.get("trackNo") ? Number(form.get("trackNo")) : null,
     title,
     kind,
     genre: form.get("genre") || null,

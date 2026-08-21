@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { artistStats, getArtistByUserId } from "@/lib/repo/artists";
 import { listTracks } from "@/lib/repo/tracks";
 import { paiementsArtiste, revenusArtiste } from "@/lib/repo/payments";
+import { albumsArtiste } from "@/lib/repo/albums";
 import StudioClient from "@/components/studio/StudioClient";
 import OpenArtistSpace from "@/components/studio/OpenArtistSpace";
 
@@ -42,6 +43,7 @@ export default async function StudioPage() {
       stats={artistStats(artist.id)}
       revenus={revenusArtiste(artist.id)}
       paiements={paiementsArtiste(artist.id, 30)}
+      albums={albumsArtiste(artist.id)}
     />
   );
 }

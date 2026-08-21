@@ -46,6 +46,19 @@ function migrate(database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS albums (
+      id          TEXT PRIMARY KEY,
+      artist_id   TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+      title       TEXT NOT NULL,
+      slug        TEXT NOT NULL,
+      kind        TEXT NOT NULL DEFAULT 'album',
+      description TEXT,
+      cover_url   TEXT,
+      released_on TEXT,
+      published   INTEGER NOT NULL DEFAULT 1,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS tracks (
       id             TEXT PRIMARY KEY,
       artist_id      TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
@@ -142,6 +155,7 @@ function migrate(database) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_tracks_artist  ON tracks(artist_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_albums_slug ON albums(artist_id, slug);
     CREATE INDEX IF NOT EXISTS idx_tracks_kind    ON tracks(kind, published);
     CREATE INDEX IF NOT EXISTS idx_tracks_created ON tracks(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_events_track   ON events(track_id, type);
@@ -164,6 +178,10 @@ function migrate(database) {
 
   // Prix du telechargement, en francs CFA. Zero signifie gratuit.
   ensureColumn(database, "tracks", "price_cfa", "INTEGER NOT NULL DEFAULT 0");
+
+  // Rattachement a un album, et rang du titre a l'interieur de celui-ci.
+  ensureColumn(database, "tracks", "album_id", "TEXT REFERENCES albums(id) ON DELETE SET NULL");
+  ensureColumn(database, "tracks", "track_no", "INTEGER");
 }
 
 function ensureColumn(database, table, column, definition) {

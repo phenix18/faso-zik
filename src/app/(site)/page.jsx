@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { listArtists } from "@/lib/repo/artists";
 import { listGenres, listTracks } from "@/lib/repo/tracks";
+import { albumsRecents } from "@/lib/repo/albums";
+import Cover from "@/components/Cover";
 import TrackGrid from "@/components/TrackGrid";
 import TrackList from "@/components/TrackList";
 import ArtistCard from "@/components/ArtistCard";
@@ -13,6 +15,7 @@ export default function HomePage() {
   const populaires = listTracks({ sort: "populaire", limit: 8 });
   const clips = listTracks({ kind: "video", limit: 6 });
   const artistes = listArtists({ limit: 8 });
+  const albums = albumsRecents(6);
   const genres = listGenres();
 
   return (
@@ -74,6 +77,29 @@ export default function HomePage() {
         <section>
           <SectionHeader title="Les plus ecoutes" href="/titres?tri=populaire" />
           <TrackList tracks={populaires} />
+        </section>
+      )}
+
+      {albums.length > 0 && (
+        <section>
+          <SectionHeader title="Albums et EP" subtitle="Les sorties completes" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+            {albums.map((album) => (
+              <Link
+                key={album.id}
+                href={`/artistes/${album.artist_slug}/${album.slug}`}
+                className="group"
+              >
+                <span className="block aspect-square overflow-hidden rounded-xl border border-faso-line">
+                  <Cover src={album.cover_url} alt={album.title} rounded="rounded-xl" />
+                </span>
+                <span className="mt-2 block truncate text-sm font-semibold text-white group-hover:text-faso-gold">
+                  {album.title}
+                </span>
+                <span className="block truncate text-xs text-white/40">{album.artist_name}</span>
+              </Link>
+            ))}
+          </div>
         </section>
       )}
 

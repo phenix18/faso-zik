@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HiCheckBadge } from "react-icons/hi2";
 import { artistStats, getArtistBySlug } from "@/lib/repo/artists";
@@ -9,6 +10,8 @@ import SoutenirArtiste from "@/components/SoutenirArtiste";
 import BoutonAbonnement from "@/components/BoutonAbonnement";
 import { currentUser } from "@/lib/auth";
 import { nombreAbonnes, suit } from "@/lib/repo/social";
+import { albumsArtiste } from "@/lib/repo/albums";
+import Cover from "@/components/Cover";
 import DonneesStructurees from "@/components/DonneesStructurees";
 import { SITE_NAME, SITE_URL } from "@/lib/siteConfig";
 import { formatCount } from "@/lib/format";
@@ -46,7 +49,9 @@ export default async function ArtistPage({ params }) {
   const user = await currentUser();
 
   const tracks = listTracks({ artistId: artist.id, limit: 200 });
-  const audios = tracks.filter((track) => track.kind === "audio");
+  const albums = albumsArtiste(artist.id, { inclureVides: false }).filter((album) => album.published);
+  // Les titres deja ranges dans un album sont presentes avec lui.
+  const audios = tracks.filter((track) => track.kind === "audio" && !track.album);
   const videos = tracks.filter((track) => track.kind === "video");
   const stats = artistStats(artist.id);
 
@@ -109,9 +114,28 @@ export default async function ArtistPage({ params }) {
         </div>
       </header>
 
+      {albums.length > 0 && (
+        <section>
+          <SectionHeader title="Albums et EP" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+            {albums.map((album) => (
+              <Link key={album.id} href={`/artistes/${artist.slug}/${album.slug}`} className="group">
+                <span className="block aspect-square overflow-hidden rounded-xl border border-faso-line">
+                  <Cover src={album.cover_url} alt={album.title} rounded="rounded-xl" />
+                </span>
+                <span className="mt-2 block truncate text-sm font-semibold text-white group-hover:text-faso-gold">
+                  {album.title}
+                </span>
+                <span className="block text-xs text-white/40">{album.titres} titre(s)</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {audios.length > 0 && (
         <section>
-          <SectionHeader title="Titres" />
+          <SectionHeader title={albums.length > 0 ? "Autres titres" : "Titres"} />
           <TrackList tracks={audios} />
         </section>
       )}

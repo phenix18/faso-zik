@@ -12,7 +12,7 @@ import { formatSize } from "@/lib/format";
  * une barre de progression fiable sur un fichier video de plusieurs centaines
  * de megaoctets.
  */
-export default function UploadForm({ onPublished }) {
+export default function UploadForm({ onPublished, albums = [] }) {
   const formRef = useRef(null);
   const [media, setMedia] = useState(null);
   const [progress, setProgress] = useState(null);
@@ -144,6 +144,30 @@ export default function UploadForm({ onPublished }) {
         </label>
         <textarea id="description" name="description" rows={3} className="input" />
       </div>
+
+      {albums.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="albumId">
+              Ranger dans un album
+            </label>
+            <select id="albumId" name="albumId" className="input">
+              <option value="">Titre isole</option>
+              {albums.map((album) => (
+                <option key={album.id} value={album.id}>
+                  {album.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="trackNo">
+              Numero de piste
+            </label>
+            <input id="trackNo" name="trackNo" type="number" min="1" className="input" />
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

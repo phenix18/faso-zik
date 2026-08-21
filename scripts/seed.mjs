@@ -43,6 +43,17 @@ const ARTISTS = [
   },
 ];
 
+// Les deux premiers titres de Yennenga Sound forment un EP.
+const ALBUMS = [
+  {
+    artist: 0,
+    titre: "Racines de Ouaga",
+    kind: "ep",
+    description: "Deux morceaux enregistres entre balafon et machines.",
+    titres: ["Faso Denya", "Balafon Sunrise"],
+  },
+];
+
 const TRACKS = [
   { artist: 0, title: "Faso Denya", genre: "Afrobeat", language: "Dioula", bpm: 102, key: "Am", allowDownload: 1, allowDj: 1 },
   { artist: 0, title: "Balafon Sunrise", genre: "Balafon moderne", language: "Instrumental", bpm: 96, key: "C", allowDownload: 0, allowDj: 1 },
@@ -189,6 +200,28 @@ for (const track of TRACKS) {
     Math.floor(Math.random() * 900),
   );
   console.log(`+ titre ${track.title} (${track.bpm} BPM)`);
+}
+
+for (const album of ALBUMS) {
+  const artistId = artistIds[album.artist];
+  const slug = slugify(album.titre);
+  let ligne = db.prepare("SELECT id FROM albums WHERE artist_id = ? AND slug = ?").get(artistId, slug);
+
+  if (!ligne) {
+    const id = newId("alb");
+    db.prepare(
+      `INSERT INTO albums (id, artist_id, title, slug, kind, description)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(id, artistId, album.titre, slug, album.kind, album.description);
+    ligne = { id };
+    console.log(`+ album ${album.titre}`);
+  }
+
+  album.titres.forEach((titre, rang) => {
+    db.prepare(
+      "UPDATE tracks SET album_id = ?, track_no = ? WHERE artist_id = ? AND title = ?",
+    ).run(ligne.id, rang + 1, artistId, titre);
+  });
 }
 
 console.log("\nCatalogue de demonstration pret. Comptes artistes : mot de passe fasozik2024");

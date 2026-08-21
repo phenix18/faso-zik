@@ -14,17 +14,17 @@ complet et **platine DJ deux voies** integree au navigateur.
 | Domaine | Fonctions |
 |---|---|
 | **Ecoute** | Lecteur global persistant (audio + clips video), file d'attente, aleatoire, repetition, plein ecran video, raccourcis clavier |
-| **Catalogue** | Nouveautes, plus ecoutes, genres, clips, fiches artistes, recherche titres / artistes / genres / langues |
+| **Catalogue** | Nouveautes, plus ecoutes, genres, albums et EP, clips, fiches artistes, recherche titres / artistes / genres / langues |
 | **Autorisations de l'artiste** | Trois droits independants par morceau — ecoute, telechargement, usage en platine — tous refuses par defaut et verifies **cote serveur** |
-| **Espace artiste** | Depot audio/video avec barre de progression, pochette, metadonnees, licence declaree, statistiques d'ecoute et de telechargement, retrait d'un titre |
-| **Bibliotheque** | Favoris et playlists par compte |
+| **Espace artiste** | Depot audio/video avec barre de progression, pochette, metadonnees, licence declaree, albums et EP avec ordre des pistes, statistiques d'ecoute et de telechargement, retrait d'un titre |
+| **Bibliotheque** | Favoris, playlists, file d'attente reordonnable, partage et lecteur integrable |
 | **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable, tempo mesure automatiquement |
 | **Droits** | Declaration obligatoire du deposant, page publique de procedure de retrait, limitation de debit sur inscription, connexion et depot |
 | **Comptes** | Reinitialisation de mot de passe par courriel, changement de nom et de mot de passe, suppression du compte et de ses fichiers |
 | **Vie du site** | Abonnement a un artiste et page des sorties suivies, classement hebdomadaire, lecteur integrable dans un site exterieur, espace d'administration |
 | **Paiement** | Achat d'un titre et soutien libre a un artiste par mobile money (Orange Money, Moov Money, Wave), revenus et part du site dans le studio |
 | **Reseau lent** | Transcodage a l'arrivee : MP3 128 kbit/s pour l'ecoute, clips decoupes en HLS 360p/720p, mode economie de donnees, application installable qui s'ouvre hors connexion |
-| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 105 tests |
+| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 116 tests |
 
 ---
 
@@ -83,7 +83,7 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 105 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements, administration, mots de passe |
+| `npm test` | 116 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements, administration, mots de passe, albums |
 | `npm run seed` | jeu de demonstration (idempotent) |
 | `npm run backup` | sauvegarde de la base et des medias |
 | `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
@@ -309,7 +309,9 @@ Build de production, puis parcours reels contre le serveur demarre :
   jetons ;
 - referencement : plan du site genere depuis le catalogue, `robots.txt` qui
   ecarte espaces personnels et fichiers, donnees structurees relues et
-  validees sur une page de titre ;
+  validees sur les pages de titre et d'album ;
+- albums : ordre des pistes tenu, pochette heritee a defaut, titre depublie
+  ecarte du public, album supprime sans emporter ses titres ;
 - parcours d'achat complet : `402` avant paiement, paiement ouvert puis
   confirme, `200` apres, second achat refuse, un autre auditeur toujours
   bloque ; pourboire encaisse, revenus et commission justes ;
