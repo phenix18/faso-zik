@@ -67,6 +67,8 @@ function migrate(database) {
       allow_download INTEGER NOT NULL DEFAULT 0,
       allow_dj       INTEGER NOT NULL DEFAULT 0,
       license        TEXT DEFAULT 'Tous droits reserves',
+      -- Attestation du deposant : il declare detenir les droits sur ce depot.
+      rights_confirmed INTEGER NOT NULL DEFAULT 0,
       published      INTEGER NOT NULL DEFAULT 1,
       plays          INTEGER NOT NULL DEFAULT 0,
       downloads      INTEGER NOT NULL DEFAULT 0,
@@ -109,6 +111,16 @@ function migrate(database) {
     CREATE INDEX IF NOT EXISTS idx_events_track   ON events(track_id, type);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tracks_slug ON tracks(artist_id, slug);
   `);
+
+  // Colonnes ajoutees apres coup : CREATE TABLE IF NOT EXISTS ne les pose pas
+  // sur une base deja creee, il faut donc les rattraper une par une.
+  ensureColumn(database, "tracks", "rights_confirmed", "INTEGER NOT NULL DEFAULT 0");
+}
+
+function ensureColumn(database, table, column, definition) {
+  const columns = database.prepare(`PRAGMA table_info(${table})`).all();
+  if (columns.some((entry) => entry.name === column)) return;
+  database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 export function getDb() {

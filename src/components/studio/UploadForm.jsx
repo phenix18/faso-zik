@@ -27,7 +27,12 @@ export default function UploadForm({ onPublished }) {
 
     // Les cases non cochees ne sont pas envoyees par le navigateur : on force
     // la valeur pour que le serveur recoive un booleen explicite.
-    for (const field of ["allowDownload", "allowDj", "published"]) {
+    if (!formRef.current.elements.rightsConfirmed.checked) {
+      toast.error("Cochez la declaration de droits pour pouvoir publier.");
+      return;
+    }
+
+    for (const field of ["allowDownload", "allowDj", "published", "rightsConfirmed"]) {
       form.set(field, formRef.current.elements[field].checked ? "true" : "false");
     }
 
@@ -151,6 +156,28 @@ export default function UploadForm({ onPublished }) {
           className="input max-w-sm"
         />
       </div>
+
+      <fieldset className="rounded-lg border border-faso-red/40 bg-faso-red/5 p-4">
+        <legend className="px-2 text-xs font-bold uppercase tracking-wide text-faso-red">
+          Declaration de droits
+        </legend>
+        <label className="flex cursor-pointer items-start gap-2">
+          <input
+            type="checkbox"
+            name="rightsConfirmed"
+            required
+            className="mt-0.5 h-4 w-4 shrink-0 accent-faso-red"
+          />
+          <span className="text-sm text-white/75">
+            Je declare detenir les droits sur cet enregistrement, ou l&apos;autorisation ecrite de
+            ceux qui les detiennent, et j&apos;accepte qu&apos;il soit retire en cas de
+            reclamation fondee.{" "}
+            <a href="/droits" target="_blank" className="text-faso-gold hover:underline">
+              Lire la procedure
+            </a>
+          </span>
+        </label>
+      </fieldset>
 
       <fieldset className="rounded-lg border border-faso-line bg-black/30 p-4">
         <legend className="px-2 text-xs font-bold uppercase tracking-wide text-faso-gold">

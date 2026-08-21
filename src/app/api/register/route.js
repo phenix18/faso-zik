@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createUser, publicUser } from "@/lib/repo/users";
 import { fail, json } from "@/lib/http";
+import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,17 @@ const schema = z.object({
 });
 
 export async function POST(request) {
+  const limit = rateLimit(clientKey(request, "register"), {
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!limit.allowed) {
+    return tooManyRequests(
+      limit.retryAfter,
+      "Trop de comptes crees depuis cette connexion. Reessayez plus tard.",
+    );
+  }
+
   let payload;
   try {
     payload = schema.parse(await request.json());

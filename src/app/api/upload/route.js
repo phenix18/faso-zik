@@ -4,6 +4,7 @@ import { getArtistByUserId } from "@/lib/repo/artists";
 import { createTrack } from "@/lib/repo/tracks";
 import { MEDIA_ROOT, removeMedia, saveUpload } from "@/lib/storage";
 import { fail, json } from "@/lib/http";
+import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,17 @@ async function readMetadata(relativePath) {
 }
 
 export async function POST(request) {
+  const limit = rateLimit(clientKey(request, "upload"), {
+    limit: 20,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!limit.allowed) {
+    return tooManyRequests(
+      limit.retryAfter,
+      "Trop de depots consecutifs. Laissez passer un moment avant de reprendre.",
+    );
+  }
+
   const user = await currentUser();
   if (!user) return fail("Connectez-vous pour publier un titre.", 401);
 
@@ -40,6 +52,15 @@ export async function POST(request) {
 
   if (!title) return fail("Le titre est obligatoire.", 422);
   if (!media || typeof media === "string") return fail("Aucun fichier audio ou video recu.", 422);
+
+  // Sans declaration de droits, rien n'entre au catalogue : c'est la seule
+  // trace que le deposant assume la paternite de ce qu'il publie.
+  if (form.get("rightsConfirmed") !== "true") {
+    return fail(
+      "Vous devez declarer detenir les droits sur cet enregistrement avant de le publier.",
+      422,
+    );
+  }
 
   const kind = media.type?.startsWith("video/") ? "video" : "audio";
 
@@ -76,6 +97,7 @@ export async function POST(request) {
     allowDownload: bool("allowDownload"),
     allowDj: bool("allowDj"),
     license: form.get("license") || undefined,
+    rightsConfirmed: true,
     published: form.get("published") !== "false",
   });
 

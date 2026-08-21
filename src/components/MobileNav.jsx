@@ -15,6 +15,7 @@ const LINKS = [
   ["/favoris", "Mes favoris"],
   ["/playlists", "Mes playlists"],
   ["/studio", "Mon studio"],
+  ["/droits", "Droits et retrait"],
 ];
 
 export default function MobileNav({ open, onClose }) {

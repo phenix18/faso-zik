@@ -77,6 +77,9 @@ export default function Sidebar() {
       <div className="mt-auto rounded-lg border border-faso-line bg-black/30 p-3 text-[11px] leading-relaxed text-white/45">
         Chaque artiste garde la main : ecoute, telechargement et usage en
         platine s&apos;activent titre par titre depuis le studio.
+        <Link href="/droits" className="mt-2 block font-semibold text-faso-gold hover:underline">
+          Droits et retrait →
+        </Link>
       </div>
     </aside>
   );

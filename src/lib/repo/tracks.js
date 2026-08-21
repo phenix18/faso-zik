@@ -29,6 +29,7 @@ export function toPublicTrack(row) {
     mime: row.media_mime,
     size: row.media_size,
     license: row.license,
+    rightsConfirmed: !!row.rights_confirmed,
     published: !!row.published,
     plays: row.plays,
     downloads: row.downloads,
@@ -140,8 +141,8 @@ export function createTrack(data) {
     `INSERT INTO tracks (
         id, artist_id, title, slug, kind, genre, language, description,
         duration, bpm, music_key, cover_url, media_path, media_mime, media_size,
-        allow_stream, allow_download, allow_dj, license, published
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        allow_stream, allow_download, allow_dj, license, rights_confirmed, published
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     id,
     data.artistId,
@@ -162,6 +163,7 @@ export function createTrack(data) {
     data.allowDownload ? 1 : 0,
     data.allowDj ? 1 : 0,
     data.license || "Tous droits reserves",
+    data.rightsConfirmed ? 1 : 0,
     data.published === false ? 0 : 1,
   );
   return getTrack(id);

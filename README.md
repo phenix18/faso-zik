@@ -19,6 +19,7 @@ complet et **platine DJ deux voies** integree au navigateur.
 | **Espace artiste** | Depot audio/video avec barre de progression, pochette, metadonnees, licence declaree, statistiques d'ecoute et de telechargement, retrait d'un titre |
 | **Bibliotheque** | Favoris et playlists par compte |
 | **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable |
+| **Droits** | Declaration obligatoire du deposant, page publique de procedure de retrait, limitation de debit sur inscription, connexion et depot |
 
 ---
 
@@ -102,6 +103,7 @@ src/
     api/            routes serveur (auth, tracks, stream, download, upload, ...)
     dj/             page platine
     studio/         espace artiste
+    droits/         procedure de retrait et engagements
     titre/ artistes/ titres/ clips/ recherche/ favoris/ playlists/
   components/
     player/         lecteur global
@@ -114,6 +116,8 @@ src/
     permissions.js  droits accordes par l'artiste
     http.js         reponses Range, JSON, erreurs
     auth.js         options NextAuth et session serveur
+    rateLimit.js    limitation de debit par fenetre glissante
+  middleware.js     freine les essais de mot de passe sur /api/auth
 ```
 
 ### Choix techniques
@@ -163,6 +167,27 @@ dans les routes serveur (`src/lib/permissions.js`) :
 L'interface se contente de refleter ces drapeaux : masquer un bouton n'est
 jamais la protection.
 
+### En amont : la declaration du deposant
+
+Aucun fichier n'entre au catalogue sans que son deposant ait declare detenir les
+droits sur l'enregistrement. La case est obligatoire dans le formulaire, et le
+serveur rejette le depot en `422` si la declaration manque — un envoi direct a
+l'API n'y echappe pas. La declaration est stockee avec le morceau
+(`tracks.rights_confirmed`). La page publique `/droits` decrit la procedure de
+retrait et ce a quoi le deposant s'engage.
+
+### Limitation de debit
+
+| Point d'entree | Limite | Fenetre |
+|---|---|---|
+| `/api/register` | 5 comptes | 1 heure |
+| `/api/upload` | 20 depots | 1 heure |
+| `/api/auth/callback`, `/api/auth/signin` | 12 tentatives | 5 minutes |
+
+Le compteur vit en memoire, ce qui suffit au deploiement vise (une instance,
+un volume). Derriere plusieurs instances, remplacer la `Map` de
+`src/lib/rateLimit.js` par Redis suffit : le reste du module ne bouge pas.
+
 ---
 
 ## Verifications effectuees
@@ -177,7 +202,11 @@ Build de production, puis parcours reels contre le serveur demarre :
 - inscription, connexion, depot d'un fichier, lecture de sa duree, suppression ;
 - platine pilotee au navigateur : chargement des deux voies, avance de la tete
   de lecture, pitch +6 % (110 → 116,6 BPM), SYNC alignant la seconde platine,
-  boucle 4 temps, crossfader — sans erreur console ni requete en echec.
+  boucle 4 temps, crossfader — sans erreur console ni requete en echec ;
+- limitation de debit : 5 inscriptions passent, la 6e recoit `429` avec
+  `Retry-After` ; 12 tentatives de connexion passent, les suivantes `429` ;
+- depot refuse en `422` sans declaration de droits, accepte avec, y compris en
+  appelant l'API directement sans passer par le formulaire.
 
 ---
 
@@ -192,11 +221,13 @@ et `src/lib/db.js` vers une base geree.
 Points a traiter avant ouverture au public :
 
 1. `NEXTAUTH_SECRET` unique et secret ;
-2. HTTPS et un proxy inverse devant l'application ;
+2. HTTPS et un proxy inverse devant l'application — la limitation de debit lit
+   `x-forwarded-for`, le proxy doit donc le renseigner lui-meme ;
 3. sauvegarde de `data/` et `storage/` ;
-4. limitation de debit sur `/api/register`, `/api/upload` et `/api/auth` ;
-5. procedure de retrait (DMCA / droits voisins) et verification que chaque
-   deposant detient bien les droits sur ce qu'il publie.
+4. adresses de contact reelles dans `NEXT_PUBLIC_CONTACT_RIGHTS` et
+   `NEXT_PUBLIC_CONTACT_GENERAL`, relevees par une personne joignable ;
+5. si le site tourne sur plusieurs instances, compteur de debit partage
+   (voir `src/lib/rateLimit.js`).
 
 ---
 
