@@ -83,3 +83,18 @@ test("seule une requete depuis le debut compte comme une ecoute", () => {
   assert.equal(isFirstRequest("bytes=-100"), true);
   assert.equal(isFirstRequest("bytes=4096-"), false);
 });
+
+test("un titre contenant des caracteres de controle ne casse pas l'en-tete", () => {
+  // Un artiste saisit ce qu'il veut : un retour a la ligne dans le titre
+  // ferait rejeter l'en-tete entier par la couche HTTP.
+  const r = reponse(null, { filename: "Faso\r\nDenya ", disposition: "attachment" });
+  const entete = r.headers.get("content-disposition");
+
+  assert.ok(entete.includes("attachment"));
+  assert.equal(/[\r\n]/.test(entete), false, "aucun retour a la ligne ne subsiste");
+});
+
+test("un titre vide apres nettoyage garde un nom de fichier utilisable", () => {
+  const r = reponse(null, { filename: "\r\n\t", disposition: "attachment" });
+  assert.match(r.headers.get("content-disposition"), /faso-zik/);
+});

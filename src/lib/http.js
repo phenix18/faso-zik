@@ -17,7 +17,14 @@ export function rangeResponse(absolutePath, stat, mime, rangeHeader, options = {
     "Last-Modified": stat.mtime.toUTCString(),
   });
   if (options.filename) {
-    const safe = options.filename.replace(/["\\]/g, "");
+    // Les guillemets et antislashs sortiraient du champ ; les caracteres de
+    // controle, eux, feraient rejeter l'en-tete entier par la couche HTTP.
+    // Un titre est saisi par l'artiste : il peut contenir n'importe quoi.
+    const safe = options.filename
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/["\\]/g, "")
+      .trim()
+      .slice(0, 150) || "faso-zik";
     headers.set(
       "Content-Disposition",
       `${options.disposition || "inline"}; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(

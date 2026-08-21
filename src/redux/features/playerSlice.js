@@ -49,6 +49,29 @@ const playerSlice = createSlice({
       state.queue.push(action.payload);
       state.isActive = true;
     },
+    /** Saut direct a une position de la file, depuis le panneau d'attente. */
+    jumpTo: (state, action) => {
+      const index = action.payload;
+      if (index < 0 || index >= state.queue.length) return;
+      state.index = index;
+      state.current = state.queue[index];
+      state.isPlaying = true;
+    },
+    removeFromQueue: (state, action) => {
+      const index = action.payload;
+      if (index < 0 || index >= state.queue.length) return;
+
+      state.queue.splice(index, 1);
+      if (!state.queue.length) return;
+
+      // Retirer un titre avant celui en cours decalerait la lecture : on
+      // suit le morceau plutot que sa position.
+      if (index < state.index) state.index -= 1;
+      else if (index === state.index) {
+        state.index = Math.min(state.index, state.queue.length - 1);
+        state.current = state.queue[state.index];
+      }
+    },
     playPause: (state, action) => {
       state.isPlaying = action.payload ?? !state.isPlaying;
     },
@@ -103,6 +126,8 @@ export const {
   playTrack,
   setQueue,
   enqueue,
+  jumpTo,
+  removeFromQueue,
   playPause,
   next,
   previous,

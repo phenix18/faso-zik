@@ -20,10 +20,11 @@ complet et **platine DJ deux voies** integree au navigateur.
 | **Bibliotheque** | Favoris et playlists par compte |
 | **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable, tempo mesure automatiquement |
 | **Droits** | Declaration obligatoire du deposant, page publique de procedure de retrait, limitation de debit sur inscription, connexion et depot |
+| **Comptes** | Reinitialisation de mot de passe par courriel, changement de nom et de mot de passe, suppression du compte et de ses fichiers |
 | **Vie du site** | Abonnement a un artiste et page des sorties suivies, classement hebdomadaire, lecteur integrable dans un site exterieur, espace d'administration |
 | **Paiement** | Achat d'un titre et soutien libre a un artiste par mobile money (Orange Money, Moov Money, Wave), revenus et part du site dans le studio |
 | **Reseau lent** | Transcodage a l'arrivee : MP3 128 kbit/s pour l'ecoute, clips decoupes en HLS 360p/720p, mode economie de donnees, application installable qui s'ouvre hors connexion |
-| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 93 tests |
+| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 105 tests |
 
 ---
 
@@ -82,7 +83,7 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 93 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements et administration |
+| `npm test` | 105 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements, administration, mots de passe |
 | `npm run seed` | jeu de demonstration (idempotent) |
 | `npm run backup` | sauvegarde de la base et des medias |
 | `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
@@ -302,6 +303,13 @@ Build de production, puis parcours reels contre le serveur demarre :
   de verifier le repli automatique vers le fichier complet ;
 - application installable : service worker actif, manifeste complet, coquille
   en cache, page de secours affichee reseau coupe ;
+- comptes : jeton de reinitialisation conserve hache et jamais en clair,
+  annule par un nouveau, mort apres usage et apres expiration ; ancien mot de
+  passe exige pour en changer ; suppression du compte qui emporte fichiers et
+  jetons ;
+- referencement : plan du site genere depuis le catalogue, `robots.txt` qui
+  ecarte espaces personnels et fichiers, donnees structurees relues et
+  validees sur une page de titre ;
 - parcours d'achat complet : `402` avant paiement, paiement ouvert puis
   confirme, `200` apres, second achat refuse, un autre auditeur toujours
   bloque ; pourboire encaisse, revenus et commission justes ;
@@ -346,15 +354,37 @@ Points a traiter avant ouverture au public :
 
 ---
 
+## Revue de securite
+
+Une revue a ete passee sur l'ensemble des changements, en suivant les chemins
+de donnees depuis les entrees utilisateur jusqu'aux operations sensibles :
+requetes SQL (toutes parametrees, les seuls fragments interpoles venant de
+listes fermees), appels a ffmpeg (`execFile` sans shell, chemins issus du
+stockage), resolution des chemins de medias, controles d'autorisation, jetons
+et signatures.
+
+**Un defaut reel en est sorti** : le fournisseur de paiement `simulation`,
+actif par defaut, laisse l'acheteur declarer lui-meme son paiement recu. Un
+site mis en ligne sans configurer son prestataire aurait donc distribue
+gratuitement les titres payants. Il est desormais refuse en production, sauf
+`PAIEMENT_SIMULATION_AUTORISEE=oui` pose sciemment.
+
+Un defaut de robustesse a ete corrige dans la foulee : un titre contenant un
+retour a la ligne faisait rejeter l'en-tete `Content-Disposition` par la couche
+HTTP, rendant le morceau intelechargeable.
+
+---
+
 ## Ce qui n'est pas fait, volontairement
 
 **Les commentaires.** Ouvrir un espace de commentaires sans equipe pour le
 moderer se retourne toujours contre les artistes. La brique est simple a
 ecrire ; c'est la moderation qui coute, et elle ne s'automatise pas.
 
-**L'envoi d'e-mails.** Les abonnements alimentent une page de nouveautes, pas
-une lettre d'information : cela demanderait un service d'envoi, une gestion des
-desabonnements et une reputation d'expediteur a tenir.
+**La lettre d'information.** Le courriel ne sert qu'a une chose : le lien de
+reinitialisation de mot de passe. Prevenir les abonnes de chaque sortie
+demanderait une gestion des desabonnements et une reputation d'expediteur a
+tenir ; les sorties suivies s'affichent donc sur une page du site.
 
 **Le reversement automatique aux artistes.** Les sommes sont comptees et
 affichees ; le virement vers leur compte mobile money reste manuel, faute

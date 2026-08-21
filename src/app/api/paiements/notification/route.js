@@ -1,5 +1,5 @@
 import { conclurePaiement, paiementParProviderRef, paiementParReference } from "@/lib/repo/payments";
-import { fournisseurActif } from "@/lib/paiement";
+import { fournisseurActif, PaiementIndisponible } from "@/lib/paiement";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -14,7 +14,13 @@ export const dynamic = "force-dynamic";
  * notification anonyme suffirait sinon a se declarer paye.
  */
 export async function POST(request) {
-  const fournisseur = fournisseurActif();
+  let fournisseur;
+  try {
+    fournisseur = fournisseurActif();
+  } catch (erreur) {
+    if (erreur instanceof PaiementIndisponible) return fail(erreur.message, 503);
+    throw erreur;
+  }
 
   // Le fournisseur de simulation ne verifie aucune signature : accepter des
   // notifications dans ce mode reviendrait a laisser n'importe qui declarer un

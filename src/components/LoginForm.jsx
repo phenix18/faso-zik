@@ -62,6 +62,11 @@ export default function LoginForm() {
         </form>
 
         <p className="mt-4 text-sm text-white/45">
+          <Link href="/mot-de-passe-oublie" className="hover:text-white">
+            Mot de passe oublie ?
+          </Link>
+        </p>
+        <p className="mt-2 text-sm text-white/45">
           Pas encore de compte ?{" "}
           <Link href="/inscription" className="font-semibold text-faso-gold hover:underline">
             Creer un compte

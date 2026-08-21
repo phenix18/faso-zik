@@ -12,6 +12,7 @@ import {
   HiForward,
   HiPause,
   HiPlay,
+  HiQueueList,
   HiSignal,
   HiSignalSlash,
   HiSpeakerWave,
@@ -19,6 +20,7 @@ import {
   HiXMark,
 } from "react-icons/hi2";
 import Cover from "@/components/Cover";
+import FileAttente from "@/components/FileAttente";
 import useMediaSource from "@/components/player/useMediaSource";
 import DownloadButton from "@/components/DownloadButton";
 import FavouriteButton from "@/components/FavouriteButton";
@@ -48,6 +50,7 @@ export default function GlobalPlayer() {
   const dispatch = useDispatch();
   const mediaRef = useRef(null);
   const [buffered, setBuffered] = useState(0);
+  const [fileOuverte, setFileOuverte] = useState(false);
   const {
     current,
     isPlaying,
@@ -318,9 +321,22 @@ export default function GlobalPlayer() {
               aria-label="Volume"
               className="w-24"
             />
-            <span className="text-xs text-white/35">
-              {queue.length > 1 ? `${index + 1}/${queue.length}` : ""}
-            </span>
+            <button
+              type="button"
+              onClick={() => setFileOuverte((etat) => !etat)}
+              aria-label="File d'attente"
+              aria-expanded={fileOuverte}
+              className={`flex items-center gap-1 text-lg ${
+                fileOuverte ? "text-faso-gold" : "text-white/45 hover:text-white"
+              }`}
+            >
+              <HiQueueList />
+              {queue.length > 1 && (
+                <span className="text-[11px] tabular-nums">
+                  {index + 1}/{queue.length}
+                </span>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => dispatch(closePlayer())}
@@ -332,6 +348,8 @@ export default function GlobalPlayer() {
           </div>
         </div>
       </div>
+
+      <FileAttente ouvert={fileOuverte} onFermer={() => setFileOuverte(false)} />
     </>
   );
 }

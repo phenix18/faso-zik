@@ -97,6 +97,16 @@ function migrate(database) {
       PRIMARY KEY (user_id, track_id)
     );
 
+    CREATE TABLE IF NOT EXISTS password_resets (
+      -- Empreinte du jeton, jamais le jeton lui-meme : une base derobee ne
+      -- doit pas permettre de reinitialiser les mots de passe.
+      token_hash TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS follows (
       user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       artist_id  TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,

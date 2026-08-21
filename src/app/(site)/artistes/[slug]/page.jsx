@@ -9,15 +9,33 @@ import SoutenirArtiste from "@/components/SoutenirArtiste";
 import BoutonAbonnement from "@/components/BoutonAbonnement";
 import { currentUser } from "@/lib/auth";
 import { nombreAbonnes, suit } from "@/lib/repo/social";
+import DonneesStructurees from "@/components/DonneesStructurees";
+import { SITE_NAME, SITE_URL } from "@/lib/siteConfig";
 import { formatCount } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export function generateMetadata({ params }) {
   const artist = getArtistBySlug(params.slug);
+  if (!artist) return { title: "Artiste introuvable" };
+
+  const description =
+    artist.bio ||
+    `Ecoutez ${artist.name}${artist.city ? `, ${artist.city}` : ""} sur ${SITE_NAME}.`;
+  const image = artist.photo_url ? `${SITE_URL}${artist.photo_url}` : `${SITE_URL}/icone-512.png`;
+
   return {
-    title: artist ? artist.name : "Artiste introuvable",
-    description: artist?.bio || `Ecoutez ${artist?.name || "cet artiste"} sur FASO-ZIK.`,
+    title: artist.name,
+    description,
+    alternates: { canonical: `${SITE_URL}/artistes/${artist.slug}` },
+    openGraph: {
+      type: "profile",
+      title: artist.name,
+      description,
+      url: `${SITE_URL}/artistes/${artist.slug}`,
+      images: [{ url: image }],
+    },
+    twitter: { card: "summary_large_image", title: artist.name, description, images: [image] },
   };
 }
 
@@ -32,8 +50,27 @@ export default async function ArtistPage({ params }) {
   const videos = tracks.filter((track) => track.kind === "video");
   const stats = artistStats(artist.id);
 
+  const donneesStructurees = {
+    "@context": "https://schema.org",
+    "@type": "MusicGroup",
+    name: artist.name,
+    url: `${SITE_URL}/artistes/${artist.slug}`,
+    description: artist.bio || undefined,
+    genre: artist.genres || undefined,
+    ...(artist.photo_url ? { image: `${SITE_URL}${artist.photo_url}` } : {}),
+    ...(artist.city
+      ? { foundingLocation: { "@type": "Place", name: `${artist.city}, ${artist.country || ""}`.trim() } }
+      : {}),
+    track: audios.slice(0, 10).map((titre) => ({
+      "@type": "MusicRecording",
+      name: titre.title,
+      url: `${SITE_URL}/titre/${titre.id}`,
+    })),
+  };
+
   return (
     <div className="flex flex-col gap-8">
+      <DonneesStructurees donnees={donneesStructurees} />
       <header className="flex flex-col items-center gap-5 rounded-2xl border border-faso-line bg-gradient-to-br from-faso-panel to-black p-6 sm:flex-row sm:items-end">
         <span className="h-28 w-28 shrink-0 overflow-hidden rounded-full border-2 border-faso-gold/40">
           {artist.photo_url ? (

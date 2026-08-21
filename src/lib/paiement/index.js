@@ -16,14 +16,30 @@ import { agregateur } from "@/lib/paiement/agregateur";
 
 const FOURNISSEURS = { simulation, agregateur };
 
+export class PaiementIndisponible extends Error {}
+
 export function fournisseurActif() {
   const nom = process.env.PAIEMENT_FOURNISSEUR || "simulation";
   const fournisseur = FOURNISSEURS[nom];
   if (!fournisseur) {
-    throw new Error(
+    throw new PaiementIndisponible(
       `Fournisseur de paiement inconnu : ${nom}. Valeurs possibles : ${Object.keys(FOURNISSEURS).join(", ")}.`,
     );
   }
+
+  // La simulation laisse l'acheteur declarer lui-meme son paiement recu :
+  // c'est ce qui la rend utile en developpement, et inacceptable en ligne.
+  // Un site mis en production sans configurer son prestataire doit refuser de
+  // vendre, plutot que de tout donner gratuitement.
+  if (fournisseur.estSimulation && process.env.NODE_ENV === "production") {
+    if (process.env.PAIEMENT_SIMULATION_AUTORISEE !== "oui") {
+      throw new PaiementIndisponible(
+        "Paiement indisponible : le fournisseur de simulation ne peut pas servir en production. " +
+          "Renseignez PAIEMENT_FOURNISSEUR et les cles de votre prestataire.",
+      );
+    }
+  }
+
   return fournisseur;
 }
 

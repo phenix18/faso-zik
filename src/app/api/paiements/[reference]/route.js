@@ -1,6 +1,6 @@
 import { currentUser } from "@/lib/auth";
 import { conclurePaiement, paiementParReference } from "@/lib/repo/payments";
-import { fournisseurActif } from "@/lib/paiement";
+import { fournisseurActif, PaiementIndisponible } from "@/lib/paiement";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -16,9 +16,8 @@ export async function GET(_request, { params }) {
   // Une notification peut se perdre : on interroge le fournisseur tant que
   // le paiement n'est pas conclu.
   if (paiement.status === "attente" && paiement.provider_ref) {
-    const fournisseur = fournisseurActif();
     try {
-      const { statut } = await fournisseur.verifier(paiement.provider_ref);
+      const { statut } = await fournisseurActif().verifier(paiement.provider_ref);
       if (statut === "paye" || statut === "echoue") {
         return json({ paiement: publier(conclurePaiement(paiement.id, statut)) });
       }
@@ -37,7 +36,14 @@ export async function GET(_request, { params }) {
  * paiement : cette route refuse d'agir des que le fournisseur est reel.
  */
 export async function POST(request, { params }) {
-  const fournisseur = fournisseurActif();
+  let fournisseur;
+  try {
+    fournisseur = fournisseurActif();
+  } catch (erreur) {
+    if (erreur instanceof PaiementIndisponible) return fail(erreur.message, 503);
+    throw erreur;
+  }
+
   if (!fournisseur.estSimulation) {
     return fail("Confirmation manuelle indisponible avec ce fournisseur.", 403);
   }

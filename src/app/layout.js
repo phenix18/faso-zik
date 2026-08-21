@@ -2,10 +2,9 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "@/redux/Providers";
 import { reprendreTranscodagesInacheves } from "@/lib/transcodeQueue";
+import { SITE_URL } from "@/lib/siteConfig";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),

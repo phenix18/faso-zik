@@ -7,6 +7,7 @@ import Cover from "@/components/Cover";
 import PlayButton from "@/components/PlayButton";
 import DownloadButton from "@/components/DownloadButton";
 import FavouriteButton from "@/components/FavouriteButton";
+import AjouterAPlaylist from "@/components/AjouterAPlaylist";
 import { formatCount, formatDuration } from "@/lib/format";
 
 export default function TrackRow({ track, queue, index, showFavourite = true }) {
@@ -63,6 +64,7 @@ export default function TrackRow({ track, queue, index, showFavourite = true }) 
 
       <div className="flex shrink-0 items-center gap-3">
         {showFavourite && <FavouriteButton trackId={track.id} />}
+        <AjouterAPlaylist trackId={track.id} />
         <DownloadButton track={track} />
         <PlayButton track={track} queue={queue} size="sm" />
       </div>

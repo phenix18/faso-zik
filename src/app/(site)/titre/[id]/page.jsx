@@ -6,6 +6,8 @@ import TrackDetailActions from "@/components/TrackDetailActions";
 import TrackList from "@/components/TrackList";
 import SectionHeader from "@/components/SectionHeader";
 import Cover from "@/components/Cover";
+import DonneesStructurees from "@/components/DonneesStructurees";
+import { SITE_NAME, SITE_URL } from "@/lib/siteConfig";
 import { formatCount, formatDuration, formatSize } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +15,30 @@ export const dynamic = "force-dynamic";
 export function generateMetadata({ params }) {
   const track = getTrack(params.id);
   if (!track) return { title: "Titre introuvable" };
+
+  const description =
+    track.description ||
+    `Ecoutez ${track.title} de ${track.artist.name} sur ${SITE_NAME}.` +
+      (track.genre ? ` Genre : ${track.genre}.` : "");
+  const image = track.coverUrl ? `${SITE_URL}${track.coverUrl}` : `${SITE_URL}/icone-512.png`;
+
   return {
     title: `${track.title} — ${track.artist.name}`,
-    description:
-      track.description || `Ecoutez ${track.title} de ${track.artist.name} sur FASO-ZIK.`,
+    description,
+    alternates: { canonical: `${SITE_URL}/titre/${track.id}` },
+    openGraph: {
+      type: track.kind === "video" ? "video.other" : "music.song",
+      title: `${track.title} — ${track.artist.name}`,
+      description,
+      url: `${SITE_URL}/titre/${track.id}`,
+      images: [{ url: image }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${track.title} — ${track.artist.name}`,
+      description,
+      images: [image],
+    },
   };
 }
 
@@ -34,8 +56,35 @@ export default function TrackPage({ params }) {
     ["Usage en platine DJ", track.permissions.dj],
   ];
 
+  const donneesStructurees = {
+    "@context": "https://schema.org",
+    "@type": track.kind === "video" ? "MusicVideoObject" : "MusicRecording",
+    name: track.title,
+    url: `${SITE_URL}/titre/${track.id}`,
+    duration: track.duration ? `PT${Math.round(track.duration)}S` : undefined,
+    genre: track.genre || undefined,
+    inLanguage: track.language || undefined,
+    byArtist: {
+      "@type": "MusicGroup",
+      name: track.artist.name,
+      url: `${SITE_URL}/artistes/${track.artist.slug}`,
+    },
+    ...(track.coverUrl ? { image: `${SITE_URL}${track.coverUrl}` } : {}),
+    ...(track.permissions.downloadPaid
+      ? {
+          offers: {
+            "@type": "Offer",
+            price: track.priceCfa,
+            priceCurrency: "XOF",
+            availability: "https://schema.org/InStock",
+          },
+        }
+      : {}),
+  };
+
   return (
     <div className="flex flex-col gap-8">
+      <DonneesStructurees donnees={donneesStructurees} />
       <article className="flex flex-col gap-6 rounded-2xl border border-faso-line bg-faso-panel/50 p-5 sm:flex-row sm:p-7">
         <div className="mx-auto h-52 w-52 shrink-0 overflow-hidden rounded-xl border border-faso-line sm:mx-0">
           <Cover src={track.coverUrl} alt={track.title} rounded="rounded-xl" />

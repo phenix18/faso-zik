@@ -17,6 +17,7 @@ const LINKS = [
   ["/favoris", "Mes favoris"],
   ["/playlists", "Mes playlists"],
   ["/studio", "Mon studio"],
+  ["/compte", "Mon compte"],
   ["/droits", "Droits et retrait"],
 ];
 

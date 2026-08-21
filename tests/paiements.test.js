@@ -195,3 +195,36 @@ test("les revenus separent ventes et soutiens, et retiennent la commission", () 
   assert.equal(revenus.net, 4500);
   assert.equal(revenus.operations, 2);
 });
+
+test("la simulation est refusee en production sans autorisation explicite", async () => {
+  const { fournisseurActif, PaiementIndisponible } = await import("@/lib/paiement");
+  const environnementInitial = process.env.NODE_ENV;
+
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.PAIEMENT_SIMULATION_AUTORISEE;
+
+    // Sans ce garde-fou, un site mis en ligne sans prestataire configure
+    // laisserait chaque acheteur declarer son propre paiement recu.
+    assert.throws(() => fournisseurActif(), PaiementIndisponible);
+
+    process.env.PAIEMENT_SIMULATION_AUTORISEE = "oui";
+    assert.equal(fournisseurActif().estSimulation, true, "l'autorisation explicite la reactive");
+  } finally {
+    process.env.NODE_ENV = environnementInitial;
+    delete process.env.PAIEMENT_SIMULATION_AUTORISEE;
+  }
+});
+
+test("un fournisseur inconnu est refuse et nomme les valeurs possibles", async () => {
+  const { fournisseurActif } = await import("@/lib/paiement");
+  const initial = process.env.PAIEMENT_FOURNISSEUR;
+
+  try {
+    process.env.PAIEMENT_FOURNISSEUR = "carte-bleue";
+    assert.throws(() => fournisseurActif(), /simulation, agregateur/);
+  } finally {
+    if (initial === undefined) delete process.env.PAIEMENT_FOURNISSEUR;
+    else process.env.PAIEMENT_FOURNISSEUR = initial;
+  }
+});

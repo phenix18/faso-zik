@@ -4,7 +4,12 @@ import { getArtistById } from "@/lib/repo/artists";
 import { getTrackRow } from "@/lib/repo/tracks";
 import { aAchete, creerPaiement, enregistrerProviderRef } from "@/lib/repo/payments";
 import { estPayant } from "@/lib/permissions";
-import { fournisseurActif, normaliserNumero, operateurValide } from "@/lib/paiement";
+import {
+  fournisseurActif,
+  normaliserNumero,
+  operateurValide,
+  PaiementIndisponible,
+} from "@/lib/paiement";
 import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 import { fail, json } from "@/lib/http";
 
@@ -79,7 +84,14 @@ export async function POST(request) {
     description = `Soutien a ${artiste.name}`;
   }
 
-  const fournisseur = fournisseurActif();
+  let fournisseur;
+  try {
+    fournisseur = fournisseurActif();
+  } catch (erreur) {
+    if (erreur instanceof PaiementIndisponible) return fail(erreur.message, 503);
+    throw erreur;
+  }
+
   const paiement = creerPaiement({
     userId: user.id,
     artistId,
