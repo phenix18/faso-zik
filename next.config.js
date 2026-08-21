@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Sortie autonome : l'image de production n'embarque que les dependances
+  // reellement tracees, au lieu de tout node_modules.
+  output: "standalone",
   experimental: {
     serverComponentsExternalPackages: ["better-sqlite3", "music-metadata"],
   },

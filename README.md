@@ -20,6 +20,7 @@ complet et **platine DJ deux voies** integree au navigateur.
 | **Bibliotheque** | Favoris et playlists par compte |
 | **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable |
 | **Droits** | Declaration obligatoire du deposant, page publique de procedure de retrait, limitation de debit sur inscription, connexion et depot |
+| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 54 tests |
 
 ---
 
@@ -78,7 +79,9 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
+| `npm test` | 54 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue |
 | `npm run seed` | jeu de demonstration (idempotent) |
+| `npm run backup` | sauvegarde de la base et des medias |
 | `npm run db:reset` | efface base et medias locaux |
 | `npm run check` | verifie que toutes les icones importees existent |
 | `npm run lint` | ESLint |
@@ -206,11 +209,26 @@ Build de production, puis parcours reels contre le serveur demarre :
 - limitation de debit : 5 inscriptions passent, la 6e recoit `429` avec
   `Retry-After` ; 12 tentatives de connexion passent, les suivantes `429` ;
 - depot refuse en `422` sans declaration de droits, accepte avec, y compris en
-  appelant l'API directement sans passer par le formulaire.
+  appelant l'API directement sans passer par le formulaire ;
+- **54 tests automatises** (`npm test`, sans dependance de test) sur les
+  autorisations, les plages HTTP Range, la resolution des chemins de medias, la
+  limitation de debit et le catalogue. Leur utilite a ete controlee en
+  introduisant deux regressions volontaires — telechargement toujours permis,
+  traversee de repertoire debloquee : les deux ont ete rattrapees ;
+- serveur autonome demarre avec le module natif SQLite, arborescence du
+  `Dockerfile` reproduite fichier par fichier, catalogue de demonstration et
+  sauvegarde executes dedans, sonde de sante saine.
 
 ---
 
 ## Mise en production
+
+```sh
+cp .env.example .env      # renseigner NEXTAUTH_SECRET et FASO_ZIK_DOMAIN
+docker compose up -d --build
+```
+
+Marche a suivre complete, sauvegardes et mise a jour : **[docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md)**.
 
 Le site a besoin d'un **disque persistant** (medias + base). Un conteneur avec
 un volume monte sur `storage/` et `data/`, ou un VPS, conviennent. Sur une

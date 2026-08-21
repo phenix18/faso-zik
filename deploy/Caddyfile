@@ -1,0 +1,27 @@
+# Caddy obtient et renouvelle le certificat TLS tout seul des que le domaine
+# pointe sur la machine. En local, laissez FASO_ZIK_DOMAIN valoir "localhost".
+
+{$FASO_ZIK_DOMAIN:localhost} {
+	encode zstd gzip
+
+	# Les clips video montent jusqu'a MAX_VIDEO_MB : sans cette ligne, le proxy
+	# couperait le depot bien avant l'application.
+	request_body {
+		max_size 500MB
+	}
+
+	# Caddy renseigne lui-meme X-Forwarded-For, sur lequel s'appuie la
+	# limitation de debit de l'application.
+	reverse_proxy app:3000 {
+		# Le streaming passe par des reponses partielles : pas de mise en
+		# tampon, sinon le deplacement dans un morceau devient poussif.
+		flush_interval -1
+	}
+
+	log {
+		output file /data/acces.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}

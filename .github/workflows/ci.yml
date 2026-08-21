@@ -1,0 +1,49 @@
+name: Controles
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une nouvelle poussee sur la meme branche annule le controle en cours.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Lint, tests et build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # better-sqlite3 est un module natif : npm ci le recupere prebuild quand
+      # il existe pour la version de Node, sinon le compile.
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Verifier les icones importees
+        run: npm run check
+
+      - name: Tests
+        run: npm test
+
+      - name: Build de production
+        run: npm run build
+        env:
+          NEXTAUTH_SECRET: secret-de-controle-continu
+          NEXTAUTH_URL: http://localhost:3000
+
+      # Le catalogue de demonstration fabrique aussi ses fichiers audio :
+      # le lancer verifie du meme coup les migrations et la synthese.
+      - name: Jeu de demonstration
+        run: npm run seed

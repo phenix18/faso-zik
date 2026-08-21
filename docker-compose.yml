@@ -1,0 +1,40 @@
+# Deploiement FASO-ZIK : l'application et son proxy.
+#
+#   cp .env.example .env   puis renseigner NEXTAUTH_SECRET et FASO_ZIK_DOMAIN
+#   docker compose up -d --build
+#   docker compose exec app node scripts/seed.mjs   (catalogue de demonstration)
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Chemins internes au conteneur : ils correspondent aux volumes ci-dessous.
+      MEDIA_ROOT: /app/storage/media
+      DATABASE_FILE: /app/data/faso-zik.db
+    volumes:
+      # Tout ce qui doit survivre a une reconstruction de l'image.
+      - ./data:/app/data
+      - ./storage/media:/app/storage/media
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      FASO_ZIK_DOMAIN: ${FASO_ZIK_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
