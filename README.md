@@ -18,11 +18,12 @@ complet et **platine DJ deux voies** integree au navigateur.
 | **Autorisations de l'artiste** | Trois droits independants par morceau — ecoute, telechargement, usage en platine — tous refuses par defaut et verifies **cote serveur** |
 | **Espace artiste** | Depot audio/video avec barre de progression, pochette, metadonnees, licence declaree, statistiques d'ecoute et de telechargement, retrait d'un titre |
 | **Bibliotheque** | Favoris et playlists par compte |
-| **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable |
+| **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable, tempo mesure automatiquement |
 | **Droits** | Declaration obligatoire du deposant, page publique de procedure de retrait, limitation de debit sur inscription, connexion et depot |
+| **Vie du site** | Abonnement a un artiste et page des sorties suivies, classement hebdomadaire, lecteur integrable dans un site exterieur, espace d'administration |
 | **Paiement** | Achat d'un titre et soutien libre a un artiste par mobile money (Orange Money, Moov Money, Wave), revenus et part du site dans le studio |
 | **Reseau lent** | Transcodage a l'arrivee : MP3 128 kbit/s pour l'ecoute, clips decoupes en HLS 360p/720p, mode economie de donnees, application installable qui s'ouvre hors connexion |
-| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 77 tests |
+| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 93 tests |
 
 ---
 
@@ -81,9 +82,10 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 77 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, paiements |
+| `npm test` | 93 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements et administration |
 | `npm run seed` | jeu de demonstration (idempotent) |
 | `npm run backup` | sauvegarde de la base et des medias |
+| `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
 | `npm run db:reset` | efface base et medias locaux |
 | `npm run check` | verifie que toutes les icones importees existent |
 | `node scripts/generate-icons.mjs` | regenere les icones de l'application |
@@ -107,10 +109,12 @@ Voir `.env.example`. Les indispensables :
 src/
   app/
     api/            routes serveur (auth, tracks, stream, download, upload, ...)
-    dj/             page platine
-    studio/         espace artiste
-    droits/         procedure de retrait et engagements
-    titre/ artistes/ titres/ clips/ recherche/ favoris/ playlists/
+    (site)/         coquille du site : navigation et lecteur global
+    embed/          lecteur integrable, sans coquille
+    (site)/dj/      page platine
+    (site)/studio/  espace artiste
+    (site)/admin/   espace d'administration
+    (site)/droits/  procedure de retrait et engagements
   components/
     player/         lecteur global
     dj/             platine (useDeck, Deck, Waveform, DjConsole)
@@ -123,6 +127,9 @@ src/
     http.js         reponses Range, JSON, erreurs
     auth.js         options NextAuth et session serveur
     rateLimit.js    limitation de debit par fenetre glissante
+    transcode.js    versions allegees (MP3, HLS) et affiches
+    bpm.js          mesure du tempo
+    paiement/       fournisseurs mobile money
   middleware.js     freine les essais de mot de passe sur /api/auth
 ```
 
@@ -210,6 +217,26 @@ un volume). Derriere plusieurs instances, remplacer la `Map` de
 
 ---
 
+## Le tempo, mesure et non declare
+
+La platine a besoin d'un BPM pour caler ses boucles et aligner deux morceaux.
+Le demander a l'artiste marche mal : le champ reste vide, ou porte une valeur
+approximative. Il est donc mesure sur le signal (`src/lib/bpm.js`) : enveloppe
+d'energie, fonction d'attaques, autocorrelation, avec deux garde-fous contre
+l'erreur d'octave — une ponderation perceptive, qui empeche la structure d'une
+mesure de passer pour le temps, et un test d'alternance d'intensite, qui
+reconnait un contretemps au lieu de doubler le tempo. Une valeur saisie par
+l'artiste prime toujours sur la mesure.
+
+Verifie sur quatorze signaux de reference : le catalogue de demonstration
+(6 tempos connus) et huit motifs construits pour mettre la methode en defaut —
+contretemps, swing, bruit, frappe imprecise, tempo non entier, morceaux lent et
+rapide. Quatorze sur quatorze a moins de 2 BPM. Le parametre d'etalement de la
+ponderation a ete **calibre sur ces signaux** : sur de la musique reelle et
+variee, une erreur d'octave reste possible — d'ou le champ modifiable.
+
+---
+
 ## Paiement mobile money
 
 Au Burkina Faso l'argent circule par Orange Money, Moov Money et les
@@ -280,7 +307,14 @@ Build de production, puis parcours reels contre le serveur demarre :
   bloque ; pourboire encaisse, revenus et commission justes ;
 - notifications de paiement : refusees sans signature, avec une signature
   erronee, et avec un corps modifie apres signature ; refusees aussi tant que
-  le fournisseur est celui de simulation.
+  le fournisseur est celui de simulation ;
+- detection du tempo : 14 signaux de reference, tous a moins de 2 BPM ;
+- administration : action refusee en `403` sans le role, role relu dans la
+  session sans reconnexion, titre retire absent du catalogue public et du
+  classement ;
+- lecteur integrable : servi sans la coquille du site, `X-Frame-Options` retire
+  sur cette seule route et remplace par `frame-ancestors`, conserve partout
+  ailleurs.
 
 ---
 
@@ -309,6 +343,22 @@ Points a traiter avant ouverture au public :
    `NEXT_PUBLIC_CONTACT_GENERAL`, relevees par une personne joignable ;
 5. si le site tourne sur plusieurs instances, compteur de debit partage
    (voir `src/lib/rateLimit.js`).
+
+---
+
+## Ce qui n'est pas fait, volontairement
+
+**Les commentaires.** Ouvrir un espace de commentaires sans equipe pour le
+moderer se retourne toujours contre les artistes. La brique est simple a
+ecrire ; c'est la moderation qui coute, et elle ne s'automatise pas.
+
+**L'envoi d'e-mails.** Les abonnements alimentent une page de nouveautes, pas
+une lettre d'information : cela demanderait un service d'envoi, une gestion des
+desabonnements et une reputation d'expediteur a tenir.
+
+**Le reversement automatique aux artistes.** Les sommes sont comptees et
+affichees ; le virement vers leur compte mobile money reste manuel, faute
+d'API de paiement sortant verifiee.
 
 ---
 

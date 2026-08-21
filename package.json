@@ -8,11 +8,12 @@
     "build": "next build && node scripts/clean-standalone.mjs",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node scripts/seed.mjs",
+    "seed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed.mjs",
     "db:reset": "node scripts/reset.mjs",
     "check": "node scripts/check-icons.mjs",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/register.mjs --test tests/*.test.js",
-    "backup": "node scripts/backup.mjs"
+    "backup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/backup.mjs",
+    "admin": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/promouvoir-admin.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.7",

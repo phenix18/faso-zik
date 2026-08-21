@@ -97,6 +97,13 @@ function migrate(database) {
       PRIMARY KEY (user_id, track_id)
     );
 
+    CREATE TABLE IF NOT EXISTS follows (
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      artist_id  TEXT NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, artist_id)
+    );
+
     CREATE TABLE IF NOT EXISTS payments (
       id           TEXT PRIMARY KEY,
       -- Reference publique, celle qui apparait dans les URL et les recus.
@@ -128,6 +135,7 @@ function migrate(database) {
     CREATE INDEX IF NOT EXISTS idx_tracks_kind    ON tracks(kind, published);
     CREATE INDEX IF NOT EXISTS idx_tracks_created ON tracks(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_events_track   ON events(track_id, type);
+    CREATE INDEX IF NOT EXISTS idx_follows_artist ON follows(artist_id);
     CREATE INDEX IF NOT EXISTS idx_payments_artist ON payments(artist_id, status);
     CREATE INDEX IF NOT EXISTS idx_payments_achat  ON payments(user_id, track_id, status);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tracks_slug ON tracks(artist_id, slug);

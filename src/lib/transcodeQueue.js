@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
 import { getTrackRow, setTranscodeResult } from "@/lib/repo/tracks";
 import { afficheVideo, analyser, ffmpegDisponible, versionEcouteAudio, versionsHls } from "@/lib/transcode";
+import { detecterBpm } from "@/lib/bpm";
 
 /**
  * File de transcodage.
@@ -99,7 +100,19 @@ async function traiter(trackId) {
   }
 
   const preview = await versionEcouteAudio(row.media_path);
-  setTranscodeResult(trackId, { status: "pret", preview, duration: duree });
+
+  // Tempo mesure sur le signal quand l'artiste ne l'a pas renseigne : sans
+  // BPM, la platine ne peut ni caler une boucle ni aligner deux morceaux.
+  let bpm = null;
+  if (!row.bpm) {
+    try {
+      bpm = await detecterBpm(preview.relativePath);
+    } catch {
+      // Un tempo introuvable n'empeche rien : le champ reste vide.
+    }
+  }
+
+  setTranscodeResult(trackId, { status: "pret", preview, duration: duree, bpm });
 }
 
 /** Etat de la file, affiche dans le studio. */

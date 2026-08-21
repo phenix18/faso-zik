@@ -13,6 +13,9 @@ import {
   HiVideoCamera,
   HiAdjustmentsHorizontal,
   HiBuildingStorefront,
+  HiTrophy,
+  HiBell,
+  HiShieldCheck,
 } from "react-icons/hi2";
 import Logo from "@/components/Logo";
 
@@ -22,10 +25,12 @@ const LINKS = [
   { href: "/titres", label: "Titres", icon: HiMusicalNote },
   { href: "/clips", label: "Clips video", icon: HiVideoCamera },
   { href: "/artistes", label: "Artistes", icon: HiMicrophone },
+  { href: "/classement", label: "Classement", icon: HiTrophy },
   { href: "/dj", label: "Platine DJ", icon: HiAdjustmentsHorizontal },
 ];
 
 const PRIVATE_LINKS = [
+  { href: "/nouveautes", label: "Nouveautes", icon: HiBell },
   { href: "/favoris", label: "Mes favoris", icon: HiHeart },
   { href: "/playlists", label: "Mes playlists", icon: HiQueueList },
 ];
@@ -72,6 +77,8 @@ export default function Sidebar() {
       </p>
       <nav className="flex flex-col gap-1">
         {item({ href: "/studio", label: "Mon studio", icon: HiBuildingStorefront })}
+        {session?.user?.role === "admin" &&
+          item({ href: "/admin", label: "Administration", icon: HiShieldCheck })}
       </nav>
 
       <div className="mt-auto rounded-lg border border-faso-line bg-black/30 p-3 text-[11px] leading-relaxed text-white/45">

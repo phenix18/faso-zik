@@ -6,6 +6,9 @@ import TrackList from "@/components/TrackList";
 import TrackGrid from "@/components/TrackGrid";
 import SectionHeader from "@/components/SectionHeader";
 import SoutenirArtiste from "@/components/SoutenirArtiste";
+import BoutonAbonnement from "@/components/BoutonAbonnement";
+import { currentUser } from "@/lib/auth";
+import { nombreAbonnes, suit } from "@/lib/repo/social";
 import { formatCount } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +21,11 @@ export function generateMetadata({ params }) {
   };
 }
 
-export default function ArtistPage({ params }) {
+export default async function ArtistPage({ params }) {
   const artist = getArtistBySlug(params.slug);
   if (!artist) notFound();
+
+  const user = await currentUser();
 
   const tracks = listTracks({ artistId: artist.id, limit: 200 });
   const audios = tracks.filter((track) => track.kind === "audio");
@@ -55,6 +60,13 @@ export default function ArtistPage({ params }) {
             <span className="chip">{formatCount(stats.plays)} ecoutes</span>
             <span className="chip">{formatCount(stats.downloads)} telechargements</span>
             <span className="chip">{stats.downloadable} titre(s) telechargeable(s)</span>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+            <BoutonAbonnement
+              artistId={artist.id}
+              initial={suit(user?.id, artist.id)}
+              abonnes={nombreAbonnes(artist.id)}
+            />
           </div>
           <SoutenirArtiste artist={{ id: artist.id, name: artist.name }} />
         </div>

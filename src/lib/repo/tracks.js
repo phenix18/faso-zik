@@ -226,7 +226,7 @@ export function deleteTrack(id) {
 }
 
 /** Enregistre le resultat du transcodage lance apres le depot. */
-export function setTranscodeResult(id, { status, preview, hlsPath, coverUrl, duration }) {
+export function setTranscodeResult(id, { status, preview, hlsPath, coverUrl, duration, bpm }) {
   const db = getDb();
   db.prepare(
     `UPDATE tracks
@@ -236,7 +236,9 @@ export function setTranscodeResult(id, { status, preview, hlsPath, coverUrl, dur
             preview_size = COALESCE(?, preview_size),
             hls_path     = COALESCE(?, hls_path),
             cover_url    = COALESCE(cover_url, ?),
-            duration     = CASE WHEN ? > 0 THEN ? ELSE duration END
+            duration     = CASE WHEN ? > 0 THEN ? ELSE duration END,
+            -- Le tempo mesure ne remplace jamais celui saisi par l'artiste.
+            bpm          = COALESCE(bpm, ?)
       WHERE id = ?`,
   ).run(
     status,
@@ -247,6 +249,7 @@ export function setTranscodeResult(id, { status, preview, hlsPath, coverUrl, dur
     coverUrl || null,
     duration || 0,
     duration || 0,
+    bpm || null,
     id,
   );
   return getTrack(id);

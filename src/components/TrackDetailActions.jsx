@@ -8,6 +8,7 @@ import { enqueue, playTrack } from "@/redux/features/playerSlice";
 import DownloadButton from "@/components/DownloadButton";
 import FavouriteButton from "@/components/FavouriteButton";
 import PaiementForm from "@/components/PaiementForm";
+import BoutonIntegrer from "@/components/BoutonIntegrer";
 import { formatCfa } from "@/lib/format";
 
 export default function TrackDetailActions({ track }) {
@@ -45,6 +46,7 @@ export default function TrackDetailActions({ track }) {
       ) : (
         <DownloadButton track={track} withLabel className="btn-ghost" />
       )}
+      {track.kind === "audio" && <BoutonIntegrer trackId={track.id} />}
       <FavouriteButton trackId={track.id} className="text-2xl" />
     </div>
 
