@@ -22,6 +22,13 @@ RUN npm run build
 FROM node:22-slim AS runner
 WORKDIR /app
 
+# ffmpeg fabrique les versions allegees : MP3 pour l'ecoute, HLS pour les
+# clips. Sans lui le site fonctionne, mais sert les fichiers d'origine — ce qui
+# est lourd sur une connexion mobile.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \

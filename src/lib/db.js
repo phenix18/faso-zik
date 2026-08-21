@@ -115,6 +115,13 @@ function migrate(database) {
   // Colonnes ajoutees apres coup : CREATE TABLE IF NOT EXISTS ne les pose pas
   // sur une base deja creee, il faut donc les rattraper une par une.
   ensureColumn(database, "tracks", "rights_confirmed", "INTEGER NOT NULL DEFAULT 0");
+
+  // Versions allegees fabriquees apres le depot (voir src/lib/transcode.js).
+  ensureColumn(database, "tracks", "preview_path", "TEXT");
+  ensureColumn(database, "tracks", "preview_mime", "TEXT");
+  ensureColumn(database, "tracks", "preview_size", "INTEGER");
+  ensureColumn(database, "tracks", "hls_path", "TEXT");
+  ensureColumn(database, "tracks", "transcode_status", "TEXT NOT NULL DEFAULT 'absent'");
 }
 
 function ensureColumn(database, table, column, definition) {

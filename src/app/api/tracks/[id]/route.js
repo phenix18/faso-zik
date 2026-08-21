@@ -2,7 +2,7 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { deleteTrack, getTrack, getTrackRow, updateTrack } from "@/lib/repo/tracks";
 import { ownsTrack } from "@/lib/permissions";
-import { removeMedia } from "@/lib/storage";
+import { removeMedia, removeMediaTree } from "@/lib/storage";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -52,5 +52,9 @@ export async function DELETE(_request, { params }) {
 
   deleteTrack(params.id);
   await removeMedia(row.media_path);
+  // Les versions derivees ne sont referencees que par ce morceau : elles
+  // partent avec lui, sinon le disque se remplit de fichiers orphelins.
+  if (row.preview_path) await removeMedia(row.preview_path);
+  if (row.hls_path) await removeMediaTree(row.hls_path);
   return json({ ok: true });
 }

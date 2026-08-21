@@ -86,6 +86,15 @@ export function mediaStats(relativePath) {
   return { absolute, stat: fs.statSync(absolute) };
 }
 
+/** Supprime un dossier de medias derives (segments HLS d'un clip). */
+export async function removeMediaTree(relativePath) {
+  try {
+    await fsp.rm(resolveMedia(relativePath), { recursive: true, force: true });
+  } catch {
+    /* deja disparu */
+  }
+}
+
 export async function removeMedia(relativePath) {
   try {
     await fsp.unlink(resolveMedia(relativePath));

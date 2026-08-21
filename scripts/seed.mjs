@@ -167,8 +167,9 @@ for (const track of TRACKS) {
     `INSERT INTO tracks (
         id, artist_id, title, slug, kind, genre, language, description,
         duration, bpm, music_key, media_path, media_mime, media_size,
-        allow_stream, allow_download, allow_dj, license, rights_confirmed, published, plays
-     ) VALUES (?,?,?,?,'audio',?,?,?,?,?,?,?,'audio/wav',?,1,?,?,?,1,1,?)`,
+        allow_stream, allow_download, allow_dj, license, rights_confirmed, published,
+        transcode_status, plays
+     ) VALUES (?,?,?,?,'audio',?,?,?,?,?,?,?,'audio/wav',?,1,?,?,?,1,1,'attente',?)`,
   ).run(
     newId("trk"),
     artistId,
@@ -191,3 +192,5 @@ for (const track of TRACKS) {
 }
 
 console.log("\nCatalogue de demonstration pret. Comptes artistes : mot de passe fasozik2024");
+console.log("Les versions d'ecoute allegees se fabriquent au premier demarrage du site,");
+console.log("si ffmpeg est installe.");

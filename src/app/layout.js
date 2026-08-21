@@ -4,6 +4,8 @@ import Providers from "@/redux/Providers";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import GlobalPlayer from "@/components/player/GlobalPlayer";
+import ServiceWorker from "@/components/ServiceWorker";
+import { reprendreTranscodagesInacheves } from "@/lib/transcodeQueue";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
@@ -33,6 +35,16 @@ export const metadata = {
       "Ecoutez, regardez et mixez les artistes du Faso. Telechargement sous autorisation de l'artiste.",
   },
   robots: { index: true, follow: true },
+  manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/favicon.png", type: "image/png" }],
+    apple: [{ url: "/icone-192.png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "FASO-ZIK",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport = {
@@ -43,6 +55,10 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
+  // Premiere page servie apres un demarrage : on relance les transcodages
+  // qu'un arret aurait interrompus. Sans effet les fois suivantes.
+  reprendreTranscodagesInacheves();
+
   return (
     <html lang="fr" className={inter.variable}>
       <body className="min-h-screen bg-faso-ink font-sans antialiased">
@@ -53,6 +69,7 @@ export default function RootLayout({ children }) {
             <main className="mx-auto max-w-[1600px] px-3 pb-40 pt-4 sm:px-5">{children}</main>
           </div>
           <GlobalPlayer />
+          <ServiceWorker />
         </Providers>
       </body>
     </html>

@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { getArtistByUserId } from "@/lib/repo/artists";
 import { createTrack } from "@/lib/repo/tracks";
 import { MEDIA_ROOT, removeMedia, saveUpload } from "@/lib/storage";
+import { planifierTranscodage } from "@/lib/transcodeQueue";
 import { fail, json } from "@/lib/http";
 import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 
@@ -100,6 +101,10 @@ export async function POST(request) {
     rightsConfirmed: true,
     published: form.get("published") !== "false",
   });
+
+  // Le depot repond tout de suite ; la version allegee se fabrique derriere.
+  // Le titre reste ecoutable dans sa version d'origine en attendant.
+  planifierTranscodage(track.id);
 
   return json({ track }, 201);
 }

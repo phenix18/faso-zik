@@ -31,6 +31,13 @@ export function toPublicTrack(row) {
     license: row.license,
     rightsConfirmed: !!row.rights_confirmed,
     published: !!row.published,
+    // "absent" : rien a faire ou ffmpeg indisponible ; "attente" / "encours" :
+    // en cours de fabrication ; "pret" : version allegee servie ; "echec".
+    transcodeStatus: row.transcode_status || "absent",
+    hasPreview: !!row.preview_path,
+    // Taille reellement transferee a l'ecoute, celle qui compte pour
+    // l'auditeur en donnees mobiles.
+    streamSize: row.preview_size || row.media_size,
     plays: row.plays,
     downloads: row.downloads,
     createdAt: row.created_at,
@@ -47,6 +54,9 @@ export function toPublicTrack(row) {
       verified: !!row.artist_verified,
     },
     streamUrl: `/api/stream/${row.id}`,
+    // Present seulement pour un clip decoupe : le lecteur le prefere alors au
+    // fichier complet.
+    hlsUrl: row.hls_path ? `/api/hls/${row.id}/master.m3u8` : null,
     downloadUrl: row.allow_download ? `/api/download/${row.id}` : null,
   };
 }
@@ -203,6 +213,41 @@ export function updateTrack(id, fields) {
 
 export function deleteTrack(id) {
   getDb().prepare("DELETE FROM tracks WHERE id = ?").run(id);
+}
+
+/** Enregistre le resultat du transcodage lance apres le depot. */
+export function setTranscodeResult(id, { status, preview, hlsPath, coverUrl, duration }) {
+  const db = getDb();
+  db.prepare(
+    `UPDATE tracks
+        SET transcode_status = ?,
+            preview_path = COALESCE(?, preview_path),
+            preview_mime = COALESCE(?, preview_mime),
+            preview_size = COALESCE(?, preview_size),
+            hls_path     = COALESCE(?, hls_path),
+            cover_url    = COALESCE(cover_url, ?),
+            duration     = CASE WHEN ? > 0 THEN ? ELSE duration END
+      WHERE id = ?`,
+  ).run(
+    status,
+    preview?.relativePath || null,
+    preview?.mime || null,
+    preview?.size || null,
+    hlsPath || null,
+    coverUrl || null,
+    duration || 0,
+    duration || 0,
+    id,
+  );
+  return getTrack(id);
+}
+
+/** Chemin du fichier a servir a l'ecoute : la version allegee si elle existe. */
+export function playbackSource(row) {
+  if (row.preview_path) {
+    return { path: row.preview_path, mime: row.preview_mime || "audio/mpeg" };
+  }
+  return { path: row.media_path, mime: row.media_mime };
 }
 
 export function recordEvent(trackId, type, userId = null) {

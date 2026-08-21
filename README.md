@@ -20,7 +20,8 @@ complet et **platine DJ deux voies** integree au navigateur.
 | **Bibliotheque** | Favoris et playlists par compte |
 | **Platine DJ** | Deux platines, crossfader a puissance constante, EQ 3 bandes + filtre balayable, pitch ±16 %, cue, boucles calees au tempo, SYNC, forme d'onde cliquable |
 | **Droits** | Declaration obligatoire du deposant, page publique de procedure de retrait, limitation de debit sur inscription, connexion et depot |
-| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 54 tests |
+| **Reseau lent** | Transcodage a l'arrivee : MP3 128 kbit/s pour l'ecoute, clips decoupes en HLS 360p/720p, mode economie de donnees, application installable qui s'ouvre hors connexion |
+| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 60 tests |
 
 ---
 
@@ -79,11 +80,12 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 54 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue |
+| `npm test` | 60 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage |
 | `npm run seed` | jeu de demonstration (idempotent) |
 | `npm run backup` | sauvegarde de la base et des medias |
 | `npm run db:reset` | efface base et medias locaux |
 | `npm run check` | verifie que toutes les icones importees existent |
+| `node scripts/generate-icons.mjs` | regenere les icones de l'application |
 | `npm run lint` | ESLint |
 
 ### Variables d'environnement
@@ -144,6 +146,20 @@ files d'attente a synchroniser.
 decode en `AudioBuffer`. C'est ce qui rend possible le saut de position
 instantane, la boucle calee a l'echantillon et le trace de la forme d'onde —
 trois choses qu'un flux `<audio>` ne permet pas.
+
+**Le fichier depose n'est pas celui qu'on diffuse.** Un artiste depose
+volontiers un WAV de 40 Mo ou un clip en 1080p ; c'est inecoutable en donnees
+mobiles. A l'arrivee, ffmpeg fabrique une version d'ecoute — MP3 128 kbit/s
+pour l'audio, HLS 360p et 720p pour les clips — pendant que l'original est
+conserve pour le telechargement. Sur le catalogue de demonstration : 12,1 Mo
+deposes, 2,2 Mo reellement diffuses ; sur un clip 1080p de 19,4 Mo, 1,2 Mo en
+360p.
+
+Le transcodage tourne **apres** la reponse au depot, un travail a la fois : sur
+un petit serveur, deux encodages video simultanes rendraient le site
+injoignable. Le titre reste ecoutable dans sa version d'origine en attendant, et
+le studio affiche l'avancement. ffmpeg reste facultatif : sans lui, les fichiers
+d'origine sont servis tels quels.
 
 ---
 
@@ -217,7 +233,16 @@ Build de production, puis parcours reels contre le serveur demarre :
   traversee de repertoire debloquee : les deux ont ete rattrapees ;
 - serveur autonome demarre avec le module natif SQLite, arborescence du
   `Dockerfile` reproduite fichier par fichier, catalogue de demonstration et
-  sauvegarde executes dedans, sonde de sante saine.
+  sauvegarde executes dedans, sonde de sante saine ;
+- transcodage de bout en bout : depot d'un WAV et d'un clip 1080p, versions
+  allegees fabriquees en arriere-plan, playlist HLS et segments servis,
+  traversee de repertoire refusee sur `/api/hls` ;
+- chaine HLS suivie dans le navigateur — playlist maitresse, puis variante
+  360p, puis premier segment. Le decodage lui-meme n'a pas pu etre observe :
+  le Chromium de test est une version sans H.264 ni AAC. C'est ce qui a permis
+  de verifier le repli automatique vers le fichier complet ;
+- application installable : service worker actif, manifeste complet, coquille
+  en cache, page de secours affichee reseau coupe.
 
 ---
 

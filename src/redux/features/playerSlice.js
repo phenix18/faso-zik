@@ -15,6 +15,9 @@ const initialState = {
   repeat: "off", // off | one | all
   shuffle: false,
   fullScreen: false,
+  // Economie de donnees : definition la plus basse et prechargement reduit.
+  // Relu depuis le navigateur au montage du lecteur.
+  dataSaver: false,
   progress: { position: 0, duration: 0 },
 };
 
@@ -86,10 +89,13 @@ const playerSlice = createSlice({
     setFullScreen: (state, action) => {
       state.fullScreen = action.payload;
     },
+    setDataSaver: (state, action) => {
+      state.dataSaver = action.payload;
+    },
     setProgress: (state, action) => {
       state.progress = action.payload;
     },
-    closePlayer: () => initialState,
+    closePlayer: (state) => ({ ...initialState, dataSaver: state.dataSaver }),
   },
 });
 
@@ -105,6 +111,7 @@ export const {
   cycleRepeat,
   toggleShuffle,
   setFullScreen,
+  setDataSaver,
   setProgress,
   closePlayer,
 } = playerSlice.actions;
