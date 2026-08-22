@@ -6,7 +6,7 @@
  *
  *   npm run admin -- adresse@exemple.bf
  */
-import { getDb } from "../src/lib/db.js";
+import { execute, fermerDb, unique } from "../src/lib/db/index.js";
 
 const email = process.argv[2]?.toLowerCase().trim();
 if (!email) {
@@ -14,13 +14,27 @@ if (!email) {
   process.exit(1);
 }
 
-const db = getDb();
-const compte = db.prepare("SELECT id, name, role FROM users WHERE email = ?").get(email);
-if (!compte) {
-  console.error(`Aucun compte avec l'adresse ${email}.`);
-  process.exit(1);
+// La connexion est fermee avant de sortir : `process.exit` couperait le
+// processus sans laisser au pilote le temps de rendre la main.
+async function promouvoir() {
+  const compte = await unique("SELECT id, name, role FROM users WHERE email = $1", [email]);
+  if (!compte) {
+    console.error(`Aucun compte avec l'adresse ${email}.`);
+    return 1;
+  }
+
+  await execute("UPDATE users SET role = 'admin' WHERE id = $1", [compte.id]);
+  console.log(`${compte.name} (${email}) est desormais administrateur.`);
+  console.log("La session en cours doit etre rouverte pour que le role prenne effet.");
+  return 0;
 }
 
-db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(compte.id);
-console.log(`${compte.name} (${email}) est desormais administrateur.`);
-console.log("La session en cours doit etre rouverte pour que le role prenne effet.");
+let code = 1;
+try {
+  code = await promouvoir();
+} catch (erreur) {
+  console.error(erreur.message);
+} finally {
+  await fermerDb();
+}
+process.exitCode = code;

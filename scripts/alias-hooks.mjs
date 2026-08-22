@@ -1,7 +1,8 @@
 /**
- * Resout l'alias "@/..." utilise par Next.js, pour que les tests importent les
- * modules de l'application sans les modifier. Le bundler ajoute aussi
- * l'extension implicitement : on refait la meme chose ici.
+ * Resout l'alias "@/..." utilise par Next.js, pour que les tests et les
+ * scripts en ligne de commande importent les modules de l'application sans les
+ * modifier. Le bundler ajoute aussi l'extension implicitement : on refait la
+ * meme chose ici.
  */
 import fs from "node:fs";
 import path from "node:path";

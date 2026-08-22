@@ -25,7 +25,7 @@ ailleurs, et tout y est asynchrone.
 
 ```sh
 npm run dev      # developpement
-npm test         # 85 tests, sans dependance de test
+npm test         # 87 tests, sans dependance de test
 npm run check    # verifie que les icones importees existent
 npm run lint
 npm run seed     # catalogue de demonstration, fichiers audio compris
@@ -33,7 +33,10 @@ npm run admin -- adresse@exemple.bf
 ```
 
 `npm test` utilise `node:test` avec un resolveur d'alias maison
-(`tests/alias-hooks.mjs`) pour importer `@/...` sans transpilation.
+(`scripts/alias-hooks.mjs`, charge par `--import ./scripts/register.mjs`) pour
+importer `@/...` sans transpilation. Les scripts en ligne de commande passent
+par le meme resolveur : sans lui, ils cassent des qu'une bibliotheque qu'ils
+traversent utilise l'alias.
 
 Sans `DATABASE_URL`, un PostgreSQL en memoire (PGlite) prend le relais : meme
 dialecte qu'en production, aucun service a lancer. C'est ce qui fait tourner

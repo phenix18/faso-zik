@@ -23,20 +23,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      # better-sqlite3 est un module natif : npm ci le recupere prebuild quand
-      # il existe pour la version de Node, sinon le compile.
       - name: Installer les dependances
         run: npm ci
-
-      # Les tests de transcodage s'ecartent tout seuls si ffmpeg manque ; on
-      # l'installe pour qu'ils s'executent vraiment.
-      - name: ffmpeg
-        run: |
-          if ! ffmpeg -version > /dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends ffmpeg
-          fi
-          ffmpeg -version | head -1
 
       - name: Lint
         run: npm run lint
@@ -44,6 +32,9 @@ jobs:
       - name: Verifier les icones importees
         run: npm run check
 
+      # Les tests montent un PostgreSQL en memoire (PGlite) : aucun service a
+      # demarrer ici. Le jeu de demonstration, lui, exige un stockage objet ;
+      # tests/scripts.test.js verifie qu'il se charge, sans le derouler.
       - name: Tests
         run: npm test
 
@@ -52,8 +43,3 @@ jobs:
         env:
           NEXTAUTH_SECRET: secret-de-controle-continu
           NEXTAUTH_URL: http://localhost:3000
-
-      # Le catalogue de demonstration fabrique aussi ses fichiers audio :
-      # le lancer verifie du meme coup les migrations et la synthese.
-      - name: Jeu de demonstration
-        run: npm run seed
