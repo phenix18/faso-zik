@@ -31,8 +31,9 @@ ailleurs, et tout y est asynchrone.
 
 ```sh
 npm run dev      # developpement
-npm test         # 94 tests, sans dependance de test
+npm test         # 95 tests, sans dependance de test
 npm run check    # verifie que les icones importees existent
+npm run verifier # controle d'installation : appelle vraiment la base et le stockage
 npm run lint
 npm run seed     # catalogue de demonstration, fichiers audio compris
 npm run admin -- adresse@exemple.bf

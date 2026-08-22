@@ -45,3 +45,14 @@ test("la promotion d'administrateur atteint la base", async () => {
   assert.match(stderr, /Aucun compte avec l'adresse inconnu@exemple\.bf/);
   assert.equal(code, 1);
 });
+
+test("le controle d'installation atteint la base et nomme ce qui manque", async () => {
+  const { code, stdout, stderr } = await lancer("verifier");
+
+  assert.ok(!stderr.includes("ERR_MODULE_NOT_FOUND"), `import non resolu : ${stderr}`);
+  // La connexion est reellement etablie : le compte de tables vient d'une requete.
+  assert.match(stdout, /connexion etablie \(pglite\) — \d+ tables/);
+  // Sans stockage ni secret de session, le controle doit refuser de conclure.
+  assert.match(stdout, /point\(s\) bloquant\(s\)/);
+  assert.equal(code, 1);
+});

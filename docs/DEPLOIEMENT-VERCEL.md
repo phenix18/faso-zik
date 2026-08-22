@@ -91,7 +91,25 @@ Reliez le depot, puis renseignez les variables de `.env.example` dans
 
 Puis deployez.
 
-## 4. Le catalogue de demonstration
+## 4. Le controle d'installation
+
+Avant d'ouvrir le site, passez le controle. Il ne lit pas les variables : il
+s'en sert. Il ouvre la base, compte ses tables, depose un objet temoin dans le
+seau, le relit par une adresse signee, compare les octets, puis l'efface.
+
+```sh
+DATABASE_URL=... S3_ENDPOINT=... S3_BUCKET=... S3_ACCESS_KEY_ID=... S3_SECRET_ACCESS_KEY=... \
+NEXTAUTH_SECRET=... npm run verifier
+```
+
+Ce qui est bloquant empeche le site de fonctionner ; ce qui est en reserve le
+laisse tourner en le diminuant — pas de reinitialisation de mot de passe sans
+SMTP, pas de vente serieuse avec le fournisseur de simulation.
+
+Une seule chose lui echappe : la regle CORS du seau. Elle ne se voit que depuis
+un navigateur, sur votre domaine.
+
+## 5. Le catalogue de demonstration
 
 ```sh
 DATABASE_URL=... SUPABASE_URL=... SUPABASE_SERVICE_KEY=... npm run seed
