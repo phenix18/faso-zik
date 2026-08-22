@@ -2,7 +2,7 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { deleteTrack, getTrack, getTrackRow, updateTrack } from "@/lib/repo/tracks";
 import { ownsTrack } from "@/lib/permissions";
-import { supprimerObjets } from "@/lib/storage";
+import { cheminDepuisAdresse, nettoyerObjets } from "@/lib/storage";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -56,6 +56,6 @@ export async function DELETE(_request, { params }) {
   await deleteTrack(params.id);
   // Les fichiers derives ne sont references que par ce morceau : ils partent
   // avec lui, sinon le stockage se remplit d'objets orphelins.
-  await supprimerObjets([row.media_path, row.preview_path]);
+  await nettoyerObjets([row.media_path, row.preview_path, cheminDepuisAdresse(row.cover_url)]);
   return json({ ok: true });
 }

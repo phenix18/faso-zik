@@ -98,6 +98,19 @@ export function exigerChemin(chemin) {
   return chemin;
 }
 
+/**
+ * Retrouve le chemin de stockage derriere une adresse de pochette.
+ *
+ * Les pochettes sont rangees en base sous la forme d'une adresse servie par
+ * l'application ; pour les effacer avec leur morceau, il faut revenir au
+ * chemin. Une adresse d'une autre forme — pochette hebergee ailleurs — ne
+ * donne rien, et n'est donc pas effacee.
+ */
+export function cheminDepuisAdresse(adresse) {
+  const chemin = String(adresse || "").replace(/^\/api\/asset\//, "");
+  return cheminValide(chemin) ? chemin : null;
+}
+
 /** Verifie type et taille avant de laisser envoyer quoi que ce soit. */
 export function verifierDepot({ kind, mime, taille }) {
   if (!ACCEPTED[kind]) throw new Error(`Type de media inconnu : ${kind}`);
@@ -160,4 +173,22 @@ export async function supprimerObjets(chemins) {
   const valides = (chemins || []).filter(cheminValide);
   if (!valides.length) return;
   await (await stockage()).remove(valides);
+}
+
+/**
+ * Nettoyage au mieux, apres une suppression deja acquise.
+ *
+ * Les lignes sont parties de la base : un stockage injoignable ne doit pas
+ * faire repondre echec a une operation irreversible qui a reussi, sinon
+ * l'appelant recommence dans le vide. Le probleme est journalise, les objets
+ * restent orphelins.
+ */
+export async function nettoyerObjets(chemins) {
+  try {
+    await supprimerObjets(chemins);
+    return true;
+  } catch (erreur) {
+    console.error("Nettoyage du stockage impossible :", erreur.message, chemins);
+    return false;
+  }
 }

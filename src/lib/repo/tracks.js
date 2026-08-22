@@ -238,31 +238,6 @@ export function playbackSource(row) {
   return { path: row.media_path, mime: row.media_mime };
 }
 
-/** Enregistre le resultat du transcodage lance apres le depot. */
-export async function setTranscodeResult(id, { preview, coverUrl, duration, bpm }) {
-  await execute(
-    `UPDATE tracks
-        SET preview_path = COALESCE($1, preview_path),
-            preview_mime = COALESCE($2, preview_mime),
-            preview_size = COALESCE($3, preview_size),
-            cover_url    = COALESCE(cover_url, $4),
-            duration     = CASE WHEN $5 > 0 THEN $5 ELSE duration END,
-            -- Le tempo mesure ne remplace jamais celui saisi par l'artiste.
-            bpm          = COALESCE(bpm, $6)
-      WHERE id = $7`,
-    [
-      preview?.relativePath || null,
-      preview?.mime || null,
-      preview?.size || null,
-      coverUrl || null,
-      duration || 0,
-      bpm || null,
-      id,
-    ],
-  );
-  return getTrack(id);
-}
-
 export async function recordEvent(trackId, type, userId = null) {
   await execute("INSERT INTO events (track_id, user_id, type) VALUES ($1, $2, $3)", [
     trackId,

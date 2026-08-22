@@ -49,7 +49,9 @@ export default async function ArtistPage({ params }) {
   const user = await currentUser();
 
   const tracks = await listTracks({ artistId: artist.id, limit: 200 });
-  const albums = await albumsArtiste(artist.id, { inclureVides: false }).filter((album) => album.published);
+  const albums = (await albumsArtiste(artist.id, { inclureVides: false })).filter(
+    (album) => album.published,
+  );
   // Les titres deja ranges dans un album sont presentes avec lui.
   const audios = tracks.filter((track) => track.kind === "audio" && !track.album);
   const videos = tracks.filter((track) => track.kind === "video");

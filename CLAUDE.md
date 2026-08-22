@@ -25,7 +25,7 @@ ailleurs, et tout y est asynchrone.
 
 ```sh
 npm run dev      # developpement
-npm test         # 87 tests, sans dependance de test
+npm test         # 89 tests, sans dependance de test
 npm run check    # verifie que les icones importees existent
 npm run lint
 npm run seed     # catalogue de demonstration, fichiers audio compris

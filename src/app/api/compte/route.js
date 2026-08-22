@@ -5,7 +5,7 @@ import { changerNom, findUserById, publicUser, supprimerCompte } from "@/lib/rep
 import { changerMotDePasse } from "@/lib/repo/passwords";
 import { getArtistByUserId } from "@/lib/repo/artists";
 import { listTracks } from "@/lib/repo/tracks";
-import { supprimerObjets } from "@/lib/storage";
+import { cheminDepuisAdresse, nettoyerObjets } from "@/lib/storage";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -17,11 +17,12 @@ export async function GET() {
 
   const compte = await findUserById(user.id);
   const artiste = await getArtistByUserId(user.id);
+  const titres = artiste ? await listTracks({ artistId: artiste.id, includeUnpublished: true }) : [];
 
   return json({
     compte: publicUser(compte),
     artiste: artiste ? { nom: artiste.name, slug: artiste.slug } : null,
-    titres: artiste ? await listTracks({ artistId: artiste.id, includeUnpublished: true }).length : 0,
+    titres: titres.length,
   });
 }
 
@@ -54,7 +55,7 @@ export async function PATCH(request) {
   }
 
   if (corps.name) {
-    getDb().prepare("UPDATE users SET name = ? WHERE id = ?").run(corps.name, user.id);
+    await changerNom(user.id, corps.name);
   }
 
   return json({ compte: publicUser(await findUserById(user.id)) });
@@ -64,8 +65,9 @@ export async function PATCH(request) {
  * Suppression du compte.
  *
  * Les enregistrements partent avec lui : les cles etrangeres s'en chargent en
- * base, les fichiers doivent etre retires du disque a la main, sinon le
- * stockage se remplit de medias que plus rien ne reference.
+ * base, les fichiers doivent etre retires du stockage a la main, sinon celui-ci
+ * se remplit de medias que plus rien ne reference. Les chemins sont releves
+ * avant la suppression, la cascade les emportant avec les lignes.
  */
 export async function DELETE(request) {
   const user = await currentUser();
@@ -77,23 +79,19 @@ export async function DELETE(request) {
   }
 
   const artiste = await getArtistByUserId(user.id);
-  const aEffacer = [];
-  if (artiste) {
-    const db = getDb();
-    for (const ligne of db
-      .prepare("SELECT media_path, preview_path, hls_path FROM tracks WHERE artist_id = ?")
-      .all(artiste.id)) {
-      aEffacer.push(ligne);
-    }
+  const titres = artiste
+    ? await query("SELECT media_path, preview_path, cover_url FROM tracks WHERE artist_id = $1", [
+        artiste.id,
+      ])
+    : [];
+
+  await supprimerCompte(user.id);
+
+  const chemins = [];
+  for (const ligne of titres) {
+    chemins.push(ligne.media_path, ligne.preview_path, cheminDepuisAdresse(ligne.cover_url));
   }
+  await nettoyerObjets(chemins);
 
-  getDb().prepare("DELETE FROM users WHERE id = ?").run(user.id);
-
-  for (const ligne of aEffacer) {
-    await removeMedia(ligne.media_path);
-    if (ligne.preview_path) await removeMedia(ligne.preview_path);
-    if (ligne.hls_path) await removeMediaTree(ligne.hls_path);
-  }
-
-  return json({ ok: true, titresSupprimes: aEffacer.length });
+  return json({ ok: true, titresSupprimes: titres.length });
 }

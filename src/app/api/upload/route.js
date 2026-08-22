@@ -3,7 +3,7 @@ import { currentUser } from "@/lib/auth";
 import { getArtistByUserId } from "@/lib/repo/artists";
 import { createTrack } from "@/lib/repo/tracks";
 import { albumParId } from "@/lib/repo/albums";
-import { cheminValide, supprimerObjets } from "@/lib/storage";
+import { cheminValide, nettoyerObjets } from "@/lib/storage";
 import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 import { fail, json } from "@/lib/http";
 
@@ -114,7 +114,7 @@ export async function POST(request) {
   } catch (erreur) {
     // Le morceau n'est pas entre : les fichiers deja deposes n'ont plus de
     // raison d'occuper le stockage.
-    await supprimerObjets([corps.mediaPath, corps.previewPath, corps.coverPath]);
+    await nettoyerObjets([corps.mediaPath, corps.previewPath, corps.coverPath]);
     return fail(`Publication impossible : ${erreur.message}`, 500);
   }
 }

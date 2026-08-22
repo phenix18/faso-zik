@@ -20,7 +20,6 @@ export default function useMediaSource(mediaRef, track, { shouldPlay = false } =
     const media = mediaRef.current;
     if (!media || !track) return undefined;
 
-    let annule = false;
     media.src = track.streamUrl;
     media.load();
 
@@ -30,10 +29,7 @@ export default function useMediaSource(mediaRef, track, { shouldPlay = false } =
       });
     }
 
-    return () => {
-      annule = true;
-      if (annule) media.pause();
-    };
+    return () => media.pause();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, track?.streamUrl]);
 }

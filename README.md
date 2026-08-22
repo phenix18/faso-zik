@@ -68,12 +68,20 @@ les artistes ont ouverts au mix.
 ```sh
 npm install
 cp .env.example .env.local          # puis renseigner NEXTAUTH_SECRET
-npm run seed                        # catalogue de demonstration (audio inclus)
 npm run dev                         # http://localhost:3000
 ```
 
+Sans `DATABASE_URL`, un PostgreSQL en memoire (PGlite) prend le relais : rien a
+installer ni a demarrer pour developper.
+
+```sh
+npm run seed                        # catalogue de demonstration (audio inclus)
+```
+
 `npm run seed` fabrique aussi les fichiers audio (WAV de synthese a differents
-tempos) : le lecteur et la platine sont utilisables immediatement.
+tempos) : le lecteur et la platine sont utilisables immediatement. Il depose ces
+fichiers dans le stockage objet, donc il demande `SUPABASE_URL` et
+`SUPABASE_SERVICE_KEY` — sans eux il s'arrete en le disant.
 
 Comptes de demonstration — mot de passe `fasozik2024` :
 `yennenga@faso-zik.bf`, `bobo.kanou@faso-zik.bf`, `sahel.digital@faso-zik.bf`.
@@ -83,10 +91,9 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 85 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements, administration, mots de passe, albums |
-| `npm run seed` | jeu de demonstration (idempotent) |
+| `npm test` | 89 tests : autorisations, chemins de medias, limitation de debit, catalogue, albums, paiements, abonnements, mots de passe, identifiants, scripts |
+| `npm run seed` | jeu de demonstration (idempotent, demande le stockage objet) |
 | `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
-| `npm run db:reset` | efface base et medias locaux |
 | `npm run check` | verifie que toutes les icones importees existent |
 | `node scripts/generate-icons.mjs` | regenere les icones de l'application |
 | `npm run lint` | ESLint |
@@ -97,8 +104,10 @@ Voir `.env.example`. Les indispensables :
 
 - `NEXTAUTH_SECRET` — cle de signature des sessions (`openssl rand -base64 32`)
 - `NEXTAUTH_URL` — URL publique du site
-- `MEDIA_ROOT` — dossier des fichiers deposes (volume persistant)
-- `DATABASE_FILE` — fichier SQLite
+- `DATABASE_URL` — connexion PostgreSQL ; vide en developpement, PGlite prend le
+  relais
+- `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` — stockage des medias ; la cle de
+  service ne quitte jamais le serveur
 - `MAX_AUDIO_MB`, `MAX_VIDEO_MB`, `MAX_IMAGE_MB` — limites de depot
 
 ---
@@ -120,18 +129,22 @@ src/
     dj/             platine (useDeck, Deck, Waveform, DjConsole)
     studio/         depot et gestion des autorisations
   lib/
-    db.js           schema SQLite et migrations
-    repo/           acces aux donnees (users, artists, tracks, library)
-    storage.js      ecriture et resolution des medias
+    db/             connexion PostgreSQL (deux pilotes) et schema
+    repo/           acces aux donnees (users, artists, tracks, albums, ...)
+    navigateur/     preparation des medias avant envoi (tempo, encodage MP3)
+    storage.js      adresses signees de depot et de lecture
     permissions.js  droits accordes par l'artiste
-    http.js         reponses Range, JSON, erreurs
+    http.js         reponses JSON et erreurs
     auth.js         options NextAuth et session serveur
-    rateLimit.js    limitation de debit par fenetre glissante
-    transcode.js    versions allegees (MP3, HLS) et affiches
-    bpm.js          mesure du tempo
+    rateLimit.js    limitation de debit, comptee en base
     paiement/       fournisseurs mobile money
-  middleware.js     freine les essais de mot de passe sur /api/auth
+scripts/
+  alias-hooks.mjs   resolveur d'alias @/... hors du bundler
 ```
+
+La limitation de debit sur la connexion est posee autour du gestionnaire
+NextAuth, dans sa propre route : un middleware Next ne tourne qu'en runtime
+Edge, ou aucun pilote de base n'existe.
 
 ### Choix techniques
 
@@ -284,21 +297,16 @@ Build de production, puis parcours reels contre le serveur demarre :
   `Retry-After` ; 12 tentatives de connexion passent, les suivantes `429` ;
 - depot refuse en `422` sans declaration de droits, accepte avec, y compris en
   appelant l'API directement sans passer par le formulaire ;
-- **54 tests automatises** (`npm test`, sans dependance de test) sur les
-  autorisations, les plages HTTP Range, la resolution des chemins de medias, la
-  limitation de debit et le catalogue. Leur utilite a ete controlee en
-  introduisant deux regressions volontaires — telechargement toujours permis,
-  traversee de repertoire debloquee : les deux ont ete rattrapees ;
-- serveur autonome demarre avec le module natif SQLite, arborescence du
-  `Dockerfile` reproduite fichier par fichier, catalogue de demonstration et
-  sauvegarde executes dedans, sonde de sante saine ;
-- transcodage de bout en bout : depot d'un WAV et d'un clip 1080p, versions
-  allegees fabriquees en arriere-plan, playlist HLS et segments servis,
-  traversee de repertoire refusee sur `/api/hls` ;
-- chaine HLS suivie dans le navigateur — playlist maitresse, puis variante
-  360p, puis premier segment. Le decodage lui-meme n'a pas pu etre observe :
-  le Chromium de test est une version sans H.264 ni AAC. C'est ce qui a permis
-  de verifier le repli automatique vers le fichier complet ;
+- **89 tests automatises** (`npm test`, sans dependance de test) sur les
+  autorisations, la resolution des chemins de medias, la limitation de debit,
+  le catalogue, les albums, les paiements, les abonnements, les mots de passe
+  et les scripts en ligne de commande. Leur utilite a ete controlee en
+  introduisant des regressions volontaires — telechargement toujours permis,
+  traversee de repertoire debloquee : toutes ont ete rattrapees ;
+- preparation du media au navigateur : decodage d'un WAV, duree et tempo lus,
+  version d'ecoute MP3 128 kbit/s fabriquee puis envoyee au stockage ;
+- le decodage H.264 n'a pas pu etre observe : le Chromium de test est une
+  version sans codecs proprietaires ;
 - application installable : service worker actif, manifeste complet, coquille
   en cache, page de secours affichee reseau coupe ;
 - comptes : jeton de reinitialisation conserve hache et jamais en clair,
@@ -328,29 +336,25 @@ Build de production, puis parcours reels contre le serveur demarre :
 
 ## Mise en production
 
-```sh
-cp .env.example .env      # renseigner NEXTAUTH_SECRET et FASO_ZIK_DOMAIN
-docker compose up -d --build
-```
+Le site vise une plateforme sans serveur. Il lui faut deux services :
 
-Marche a suivre complete, sauvegardes et mise a jour : **[docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md)**.
+1. une base **PostgreSQL** geree — `DATABASE_URL` ;
+2. un **stockage objet** — `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
 
-Le site a besoin d'un **disque persistant** (medias + base). Un conteneur avec
-un volume monte sur `storage/` et `data/`, ou un VPS, conviennent. Sur une
-plateforme sans systeme de fichiers durable (Vercel et assimiles), il faut
-d'abord deplacer `src/lib/storage.js` vers un stockage objet (S3, Cloudflare R2)
-et `src/lib/db.js` vers une base geree.
+Marche a suivre complete : **[docs/DEPLOIEMENT-VERCEL.md](docs/DEPLOIEMENT-VERCEL.md)**.
 
 Points a traiter avant ouverture au public :
 
 1. `NEXTAUTH_SECRET` unique et secret ;
-2. HTTPS et un proxy inverse devant l'application — la limitation de debit lit
-   `x-forwarded-for`, le proxy doit donc le renseigner lui-meme ;
-3. sauvegarde de `data/` et `storage/` ;
-4. adresses de contact reelles dans `NEXT_PUBLIC_CONTACT_RIGHTS` et
+2. adresses de contact reelles dans `NEXT_PUBLIC_CONTACT_RIGHTS` et
    `NEXT_PUBLIC_CONTACT_GENERAL`, relevees par une personne joignable ;
-5. si le site tourne sur plusieurs instances, compteur de debit partage
-   (voir `src/lib/rateLimit.js`).
+3. SMTP renseigne, sans quoi la reinitialisation de mot de passe reste fermee ;
+4. prestataire de paiement configure : le fournisseur `simulation` est refuse
+   en production, et laisserait sinon l'acheteur se declarer paye lui-meme ;
+5. le site vendant des morceaux, un plan autorisant l'usage commercial.
+
+La base porte la limitation de debit : plusieurs instances partagent donc le
+meme compteur, sans rien a configurer.
 
 ---
 

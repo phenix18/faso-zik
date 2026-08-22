@@ -17,7 +17,6 @@ const PAGE_HORS_LIGNE = "/hors-ligne";
 
 const CHEMINS_IGNORES = [
   "/api/stream/",
-  "/api/hls/",
   "/api/download/",
   "/api/asset/",
   "/api/auth/",

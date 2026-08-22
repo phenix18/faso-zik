@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-// Base jetable : le module lit DATABASE_FILE au premier acces.
+// Base jetable : sans DATABASE_URL, PGlite monte un PostgreSQL en memoire.
 
 const { createUser, promoteToArtist } = await import("@/lib/repo/users");
 const { getArtistByUserId, artistStats } = await import("@/lib/repo/artists");

@@ -84,7 +84,7 @@ export default function AdminClient({ resume, artistes, titres }) {
                   agir({ action: "verifier", artistId: artiste.id }, ({ verifie }) => {
                     setListe((actuelle) =>
                       actuelle.map((item) =>
-                        item.id === artiste.id ? { ...item, verified: verifie ? 1 : 0 } : item,
+                        item.id === artiste.id ? { ...item, verified: verifie } : item,
                       ),
                     );
                     toast.success(verifie ? "Artiste verifie." : "Verification retiree.");

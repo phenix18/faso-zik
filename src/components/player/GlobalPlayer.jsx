@@ -67,7 +67,7 @@ export default function GlobalPlayer() {
 
   const isVideo = current?.kind === "video";
 
-  // Choix du flux (fichier complet ou HLS) selon le morceau et le navigateur.
+  // Attache la source et relance la lecture au changement de morceau.
   useMediaSource(mediaRef, current, { shouldPlay: isPlaying });
 
   // La preference d'economie de donnees appartient a l'appareil, pas au compte :
