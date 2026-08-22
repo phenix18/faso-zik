@@ -21,7 +21,7 @@ export default async function FavorisPage() {
     );
   }
 
-  const tracks = listFavourites(user.id);
+  const tracks = await listFavourites(user.id);
 
   return (
     <div className="flex flex-col gap-5">

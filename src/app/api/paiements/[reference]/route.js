@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** Etat d'un paiement, consulte par la page d'attente. */
 export async function GET(_request, { params }) {
   const user = await currentUser();
-  const paiement = paiementParReference(params.reference);
+  const paiement = await paiementParReference(params.reference);
   if (!paiement) return fail("Paiement introuvable.", 404);
   if (!user || paiement.user_id !== user.id) return fail("Ce paiement ne vous appartient pas.", 403);
 
@@ -19,7 +19,7 @@ export async function GET(_request, { params }) {
     try {
       const { statut } = await fournisseurActif().verifier(paiement.provider_ref);
       if (statut === "paye" || statut === "echoue") {
-        return json({ paiement: publier(conclurePaiement(paiement.id, statut)) });
+        return json({ paiement: publier(await conclurePaiement(paiement.id, statut)) });
       }
     } catch {
       // Fournisseur injoignable : on renvoie l'etat connu plutot qu'une erreur.
@@ -49,7 +49,7 @@ export async function POST(request, { params }) {
   }
 
   const user = await currentUser();
-  const paiement = paiementParReference(params.reference);
+  const paiement = await paiementParReference(params.reference);
   if (!paiement) return fail("Paiement introuvable.", 404);
   if (!user || paiement.user_id !== user.id) return fail("Ce paiement ne vous appartient pas.", 403);
 
@@ -57,10 +57,10 @@ export async function POST(request, { params }) {
   const statut = resultat === "echoue" ? "echoue" : "paye";
   await fournisseur.forcerResultat(paiement.provider_ref, statut);
 
-  return json({ paiement: publier(conclurePaiement(paiement.id, statut, "Confirmation simulee")) });
+  return json({ paiement: publier(await conclurePaiement(paiement.id, statut, "Confirmation simulee")) });
 }
 
-function publier(paiement) {
+async function publier(paiement) {
   return {
     reference: paiement.reference,
     type: paiement.type,

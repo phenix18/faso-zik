@@ -4,8 +4,8 @@ import ArtistCard from "@/components/ArtistCard";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Artistes" };
 
-export default function ArtistesPage({ searchParams }) {
-  const artists = listArtists({ search: searchParams?.q || "", limit: 200 });
+export default async function ArtistesPage({ searchParams }) {
+  const artists = await listArtists({ search: searchParams?.q || "", limit: 200 });
 
   return (
     <div className="flex flex-col gap-5">

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await currentUser();
   if (!user) return fail("Connexion requise.", 401);
-  return json({ playlists: listPlaylists(user.id) });
+  return json({ playlists: await listPlaylists(user.id) });
 }
 
 export async function POST(request) {
@@ -18,5 +18,5 @@ export async function POST(request) {
   const { name, isPublic } = await request.json();
   if (!name?.trim()) return fail("Donnez un nom a la playlist.", 422);
 
-  return json({ playlist: createPlaylist(user.id, name.trim(), !!isPublic) }, 201);
+  return json({ playlist: await createPlaylist(user.id, name.trim(), !!isPublic) }, 201);
 }

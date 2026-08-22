@@ -21,14 +21,14 @@ export async function POST(request) {
 
   if (action === "verifier") {
     if (!artistId) return fail("Identifiant d'artiste manquant.", 422);
-    const etat = basculerVerification(artistId);
+    const etat = await basculerVerification(artistId);
     if (etat === null) return fail("Artiste introuvable.", 404);
     return json({ verifie: etat });
   }
 
   if (action === "retirer") {
     if (!trackId) return fail("Identifiant de titre manquant.", 422);
-    retirerTitre(trackId);
+    await retirerTitre(trackId);
     return json({ retire: true });
   }
 

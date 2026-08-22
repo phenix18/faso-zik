@@ -9,41 +9,49 @@ Masquer un bouton n'est jamais la protection : si une adresse existe, elle doit
 refuser d'elle-meme.
 
 **Le fichier depose n'est pas celui qu'on diffuse.** L'original sert au
-telechargement autorise ; la version d'ecoute (MP3, ou HLS pour les clips) est
-fabriquee par `src/lib/transcodeQueue.js` apres la reponse au depot.
-`playbackSource()` decide lequel servir.
+telechargement autorise ; la version d'ecoute (MP3 128 kbit/s) est fabriquee
+**dans le navigateur** avant l'envoi (`src/lib/navigateur/`). `playbackSource()`
+decide lequel servir.
+
+**L'application ne fait jamais passer les octets d'un media.** Elle verifie
+l'autorisation puis redirige vers une adresse signee du stockage. Au depot,
+c'est l'inverse : le navigateur envoie directement au stockage, avec une
+adresse signee que l'application lui a delivree.
 
 **Tout l'acces aux donnees passe par `src/lib/repo/*`.** Aucune requete SQL
-ailleurs. C'est ce qui rend une migration vers PostgreSQL circonscrite.
+ailleurs, et tout y est asynchrone.
 
 ## Commandes
 
 ```sh
 npm run dev      # developpement
-npm test         # 116 tests, sans dependance de test
+npm test         # 85 tests, sans dependance de test
 npm run check    # verifie que les icones importees existent
 npm run lint
 npm run seed     # catalogue de demonstration, fichiers audio compris
-npm run db:reset # efface base et medias locaux
+npm run admin -- adresse@exemple.bf
 ```
 
 `npm test` utilise `node:test` avec un resolveur d'alias maison
 (`tests/alias-hooks.mjs`) pour importer `@/...` sans transpilation.
 
+Sans `DATABASE_URL`, un PostgreSQL en memoire (PGlite) prend le relais : meme
+dialecte qu'en production, aucun service a lancer. C'est ce qui fait tourner
+les tests.
+
 ## Pieges rencontres, a ne pas refaire
 
-- **`outputFileTracingExcludes` casse la sortie autonome** dans Next 14.2 : le
-  traceur sur-exclut et laisse de cote des modules internes. Le nettoyage se
-  fait apres coup, dans `scripts/clean-standalone.mjs`.
-- **`instrumentation.js` est compile aussi pour le runtime Edge**, ou le pilote
-  SQLite n'existe pas. La reprise des transcodages part donc de la mise en page
-  racine.
+- **Un middleware Next ne tourne qu'en runtime Edge**, ou aucun pilote de base
+  n'existe. La limitation de debit sur la connexion est donc posee autour du
+  gestionnaire NextAuth, dans sa propre route.
+- **PGlite embarque du WebAssembly**, interdit en Edge : les deux pilotes sont
+  declares dans `serverComponentsExternalPackages`, et rien qui touche a la
+  base ne doit remonter dans un fichier compile pour Edge.
 - **Les icones `react-icons` inexistantes ne cassent pas la compilation** : le
   composant vaut `undefined` et React plante au rendu, parfois dans une branche
   rare. D'ou `npm run check`.
-- **hls.js s'attache de facon asynchrone** : appeler `play()` juste apres le
-  changement de morceau ne marche pas. Le demarrage se fait dans
-  `useMediaSource`, une fois la source posee.
+- **Les entiers larges reviennent parfois en chaine** selon le pilote : les
+  tailles de fichier passent par `Number()` avant d'aller au navigateur.
 - **Le fournisseur de paiement `simulation` laisse l'acheteur se declarer
   paye.** Il est refuse en production sauf autorisation explicite. Ne pas
   relacher ce garde-fou.

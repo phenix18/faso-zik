@@ -7,10 +7,10 @@ import SectionHeader from "@/components/SectionHeader";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Recherche" };
 
-export default function RecherchePage({ searchParams }) {
+export default async function RecherchePage({ searchParams }) {
   const query = (searchParams?.q || "").trim();
-  const tracks = query ? listTracks({ search: query, limit: 100 }) : [];
-  const artists = query ? listArtists({ search: query, limit: 12 }) : [];
+  const tracks = query ? await listTracks({ search: query, limit: 100 }) : [];
+  const artists = query ? await listArtists({ search: query, limit: 12 }) : [];
 
   if (!query) {
     return (

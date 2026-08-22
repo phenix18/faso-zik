@@ -23,8 +23,8 @@ complet et **platine DJ deux voies** integree au navigateur.
 | **Comptes** | Reinitialisation de mot de passe par courriel, changement de nom et de mot de passe, suppression du compte et de ses fichiers |
 | **Vie du site** | Abonnement a un artiste et page des sorties suivies, classement hebdomadaire, lecteur integrable dans un site exterieur, espace d'administration |
 | **Paiement** | Achat d'un titre et soutien libre a un artiste par mobile money (Orange Money, Moov Money, Wave), revenus et part du site dans le studio |
-| **Reseau lent** | Transcodage a l'arrivee : MP3 128 kbit/s pour l'ecoute, clips decoupes en HLS 360p/720p, mode economie de donnees, application installable qui s'ouvre hors connexion |
-| **Exploitation** | Image Docker, Compose avec proxy HTTPS, sauvegardes, integration continue et 116 tests |
+| **Reseau lent** | Version d'ecoute MP3 128 kbit/s fabriquee dans le navigateur avant l'envoi, application installable qui s'ouvre hors connexion |
+| **Exploitation** | Deploiement Vercel, PostgreSQL et stockage objet, integration continue et 85 tests |
 
 ---
 
@@ -83,9 +83,8 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 116 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements, administration, mots de passe, albums |
+| `npm test` | 85 tests : autorisations, plages HTTP Range, chemins de medias, limitation de debit, catalogue, transcodage, tempo, paiements, abonnements, administration, mots de passe, albums |
 | `npm run seed` | jeu de demonstration (idempotent) |
-| `npm run backup` | sauvegarde de la base et des medias |
 | `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
 | `npm run db:reset` | efface base et medias locaux |
 | `npm run check` | verifie que toutes les icones importees existent |
@@ -136,16 +135,19 @@ src/
 
 ### Choix techniques
 
-**SQLite plutot qu'un serveur de base.** Le site heberge lui-meme les fichiers
-audio et video : il lui faut de toute facon un volume disque persistant, donc
-un VPS ou un conteneur. Dans ce cadre un moteur embarque evite un service de
-plus a exploiter. Tout l'acces aux donnees passe par `src/lib/repo/*` : migrer
-vers PostgreSQL revient a reecrire ces quatre modules, pas l'application.
+**PostgreSQL, et rien sur le disque local.** Le site tourne sur une plateforme
+sans serveur : le disque d'une fonction est ephemere, rien de ce qu'on y ecrit
+ne survit ni n'est partage. La base vit donc dehors, et les fichiers dans un
+stockage objet. En developpement et pour les tests, un PostgreSQL compile en
+WebAssembly (PGlite) tourne dans le processus : meme dialecte qu'en production,
+aucun service a lancer.
 
-**Streaming avec en-tetes Range (HTTP 206).** Sans reponse partielle, un
-navigateur ne peut ni deplacer la tete de lecture dans une video ni reprendre
-un telechargement coupe. `src/lib/http.js` implemente la RFC 7233, y compris la
-forme suffixe (`bytes=-500`) et le refus `416` hors limites.
+**L'application ne fait jamais passer les octets d'un media.** A la lecture,
+elle verifie l'autorisation puis redirige vers une adresse signee de courte
+duree ; c'est le stockage qui sert le fichier et repond aux requetes
+partielles. Au depot, c'est l'inverse : le navigateur envoie directement au
+stockage, ce qui permet un clip de plusieurs centaines de megaoctets la ou
+aucune fonction n'accepterait un tel corps de requete.
 
 **Un seul element de lecture pour l'audio et la video.** Un `<video>` unique
 joue les MP3 comme les clips ; deux moteurs concurrents auraient signifie deux
@@ -157,18 +159,14 @@ instantane, la boucle calee a l'echantillon et le trace de la forme d'onde —
 trois choses qu'un flux `<audio>` ne permet pas.
 
 **Le fichier depose n'est pas celui qu'on diffuse.** Un artiste depose
-volontiers un WAV de 40 Mo ou un clip en 1080p ; c'est inecoutable en donnees
-mobiles. A l'arrivee, ffmpeg fabrique une version d'ecoute — MP3 128 kbit/s
-pour l'audio, HLS 360p et 720p pour les clips — pendant que l'original est
-conserve pour le telechargement. Sur le catalogue de demonstration : 12,1 Mo
-deposes, 2,2 Mo reellement diffuses ; sur un clip 1080p de 19,4 Mo, 1,2 Mo en
-360p.
+volontiers un WAV de 40 Mo ; c'est inecoutable en donnees mobiles. Le
+navigateur decode le fichier, en tire la duree et le tempo, puis fabrique une
+version d'ecoute MP3 128 kbit/s — le tout sur le poste de l'artiste, sans
+serveur de transcodage. L'original part au stockage pour le telechargement
+autorise, la version allegee pour l'ecoute.
 
-Le transcodage tourne **apres** la reponse au depot, un travail a la fois : sur
-un petit serveur, deux encodages video simultanes rendraient le site
-injoignable. Le titre reste ecoutable dans sa version d'origine en attendant, et
-le studio affiche l'avancement. ffmpeg reste facultatif : sans lui, les fichiers
-d'origine sont servis tels quels.
+Les clips, eux, sont servis tels qu'ils ont ete deposes : les decouper
+demanderait ffmpeg, absent du runtime.
 
 ---
 
@@ -222,7 +220,7 @@ un volume). Derriere plusieurs instances, remplacer la `Map` de
 
 La platine a besoin d'un BPM pour caler ses boucles et aligner deux morceaux.
 Le demander a l'artiste marche mal : le champ reste vide, ou porte une valeur
-approximative. Il est donc mesure sur le signal (`src/lib/bpm.js`) : enveloppe
+approximative. Il est donc mesure sur le signal, dans le navigateur (`src/lib/navigateur/tempo.js`) : enveloppe
 d'energie, fonction d'attaques, autocorrelation, avec deux garde-fous contre
 l'erreur d'octave — une ponderation perceptive, qui empeche la structure d'une
 mesure de passer pour le temps, et un test d'alternance d'intensite, qui

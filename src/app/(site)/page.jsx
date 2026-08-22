@@ -10,13 +10,13 @@ import SectionHeader from "@/components/SectionHeader";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  const nouveautes = listTracks({ limit: 12 });
-  const populaires = listTracks({ sort: "populaire", limit: 8 });
-  const clips = listTracks({ kind: "video", limit: 6 });
-  const artistes = listArtists({ limit: 8 });
-  const albums = albumsRecents(6);
-  const genres = listGenres();
+export default async function HomePage() {
+  const nouveautes = await listTracks({ limit: 12 });
+  const populaires = await listTracks({ sort: "populaire", limit: 8 });
+  const clips = await listTracks({ kind: "video", limit: 6 });
+  const artistes = await listArtists({ limit: 8 });
+  const albums = await albumsRecents(6);
+  const genres = await listGenres();
 
   return (
     <div className="flex flex-col gap-10">

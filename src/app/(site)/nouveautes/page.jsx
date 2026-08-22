@@ -25,8 +25,8 @@ export default async function NouveautesPage() {
     );
   }
 
-  const artistes = artistesSuivis(user.id);
-  const titres = nouveautesSuivies(user.id);
+  const artistes = await artistesSuivis(user.id);
+  const titres = await nouveautesSuivies(user.id);
 
   return (
     <div className="flex flex-col gap-8">

@@ -34,7 +34,7 @@ const schema = z.object({
  * navigateur : sinon n'importe qui achetterait un titre a un franc.
  */
 export async function POST(request) {
-  const limite = rateLimit(clientKey(request, "paiement"), {
+  const limite = await rateLimit(clientKey(request, "paiement"), {
     limit: 15,
     windowMs: 10 * 60 * 1000,
   });
@@ -63,17 +63,17 @@ export async function POST(request) {
   let description;
 
   if (corps.type === "achat") {
-    const morceau = getTrackRow(corps.trackId || "");
+    const morceau = await getTrackRow(corps.trackId || "");
     if (!morceau) return fail("Morceau introuvable.", 404);
     if (!estPayant(morceau)) return fail("Ce titre n'est pas en vente.", 409);
-    if (aAchete(user.id, morceau.id)) return fail("Vous avez deja achete ce titre.", 409);
+    if (await aAchete(user.id, morceau.id)) return fail("Vous avez deja achete ce titre.", 409);
 
     artistId = morceau.artist_id;
     trackId = morceau.id;
     montant = morceau.price_cfa;
     description = `${morceau.title} — ${morceau.artist_name}`;
   } else {
-    const artiste = getArtistById(corps.artistId || "");
+    const artiste = await getArtistById(corps.artistId || "");
     if (!artiste) return fail("Artiste introuvable.", 404);
     if (!corps.montant || corps.montant < MONTANT_MINIMUM) {
       return fail(`Le pourboire minimum est de ${MONTANT_MINIMUM} F CFA.`, 422);
@@ -92,7 +92,7 @@ export async function POST(request) {
     throw erreur;
   }
 
-  const paiement = creerPaiement({
+  const paiement = await creerPaiement({
     userId: user.id,
     artistId,
     trackId,
@@ -111,7 +111,7 @@ export async function POST(request) {
       numero,
       description,
     });
-    enregistrerProviderRef(paiement.id, demande.providerRef);
+    await enregistrerProviderRef(paiement.id, demande.providerRef);
 
     return json(
       {

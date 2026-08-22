@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import { getDb } from "@/lib/db";
+import { execute, transaction, unique } from "@/lib/db";
 
 /**
  * Reinitialisation de mot de passe.
@@ -16,30 +16,32 @@ function empreinte(jeton) {
   return crypto.createHash("sha256").update(jeton).digest("hex");
 }
 
-export function creerJetonReinitialisation(userId) {
-  const db = getDb();
+export async function creerJetonReinitialisation(userId) {
   const jeton = crypto.randomBytes(32).toString("base64url");
 
-  // Un nouveau lien annule les precedents : sinon un ancien courriel resterait
-  // valable apres coup.
-  db.prepare("DELETE FROM password_resets WHERE user_id = ?").run(userId);
-  db.prepare(
-    `INSERT INTO password_resets (token_hash, user_id, expires_at)
-     VALUES (?, ?, datetime('now', ?))`,
-  ).run(empreinte(jeton), userId, `+${DUREE_MINUTES} minutes`);
+  await transaction(async (q) => {
+    // Un nouveau lien annule les precedents : sinon un ancien courriel
+    // resterait valable apres coup.
+    await q("DELETE FROM password_resets WHERE user_id = $1", [userId]);
+    await q(
+      `INSERT INTO password_resets (token_hash, user_id, expires_at)
+       VALUES ($1, $2, now() + ($3 || ' minutes')::interval)`,
+      [empreinte(jeton), userId, String(DUREE_MINUTES)],
+    );
+  });
 
   return { jeton, dureeMinutes: DUREE_MINUTES };
 }
 
 /** @returns l'identifiant du compte, ou null si le jeton ne vaut plus rien. */
-export function comptePourJeton(jeton) {
-  const ligne = getDb()
-    .prepare(
-      `SELECT user_id FROM password_resets
-        WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')`,
-    )
-    .get(empreinte(jeton || ""));
+export async function comptePourJeton(jeton) {
+  if (!jeton) return null;
 
+  const ligne = await unique(
+    `SELECT user_id FROM password_resets
+      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()`,
+    [empreinte(jeton)],
+  );
   return ligne?.user_id || null;
 }
 
@@ -47,43 +49,46 @@ export function comptePourJeton(jeton) {
  * Change le mot de passe et consomme le jeton dans la meme transaction : deux
  * demandes simultanees ne peuvent pas l'utiliser deux fois.
  */
-export function appliquerReinitialisation(jeton, motDePasse) {
-  const db = getDb();
-  const userId = comptePourJeton(jeton);
+export async function appliquerReinitialisation(jeton, motDePasse) {
+  const userId = await comptePourJeton(jeton);
   if (!userId) return false;
 
-  db.transaction(() => {
-    db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
-      bcrypt.hashSync(motDePasse, 10),
-      userId,
-    );
-    db.prepare("UPDATE password_resets SET used_at = datetime('now') WHERE token_hash = ?").run(
-      empreinte(jeton),
-    );
-  })();
+  const hash = bcrypt.hashSync(motDePasse, 10);
+  let applique = false;
 
-  return true;
+  await transaction(async (q) => {
+    // La condition sur used_at est dans l'ecriture : c'est elle qui garantit
+    // qu'un seul appel l'emporte.
+    const marque = await q(
+      "UPDATE password_resets SET used_at = now() WHERE token_hash = $1 AND used_at IS NULL",
+      [empreinte(jeton)],
+    );
+    const touchees = marque.count ?? marque.length ?? 0;
+    if (!touchees) return;
+
+    await q("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, userId]);
+    applique = true;
+  });
+
+  return applique;
 }
 
 /** Purge des jetons perimes : ils n'ont plus aucune utilite. */
-export function purgerJetonsExpires() {
-  return getDb()
-    .prepare("DELETE FROM password_resets WHERE expires_at <= datetime('now')")
-    .run().changes;
+export async function purgerJetonsExpires() {
+  return execute("DELETE FROM password_resets WHERE expires_at <= now()");
 }
 
 /** Changement de mot de passe par un compte connecte, ancien mot de passe exige. */
-export function changerMotDePasse(userId, ancien, nouveau) {
-  const db = getDb();
-  const compte = db.prepare("SELECT password_hash FROM users WHERE id = ?").get(userId);
+export async function changerMotDePasse(userId, ancien, nouveau) {
+  const compte = await unique("SELECT password_hash FROM users WHERE id = $1", [userId]);
   if (!compte) return { ok: false, raison: "Compte introuvable." };
   if (!compte.password_hash || !bcrypt.compareSync(ancien, compte.password_hash)) {
     return { ok: false, raison: "Mot de passe actuel incorrect." };
   }
 
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
+  await execute("UPDATE users SET password_hash = $1 WHERE id = $2", [
     bcrypt.hashSync(nouveau, 10),
     userId,
-  );
+  ]);
   return { ok: true };
 }

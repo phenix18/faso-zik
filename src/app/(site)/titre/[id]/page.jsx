@@ -12,8 +12,8 @@ import { formatCount, formatDuration, formatSize } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }) {
-  const track = getTrack(params.id);
+export async function generateMetadata({ params }) {
+  const track = await getTrack(params.id);
   if (!track) return { title: "Titre introuvable" };
 
   const description =
@@ -42,11 +42,11 @@ export function generateMetadata({ params }) {
   };
 }
 
-export default function TrackPage({ params }) {
-  const track = getTrack(params.id);
+export default async function TrackPage({ params }) {
+  const track = await getTrack(params.id);
   if (!track || !track.published) notFound();
 
-  const sameArtist = listTracks({ artistId: track.artist.id, limit: 12 }).filter(
+  const sameArtist = await listTracks({ artistId: track.artist.id, limit: 12 }).filter(
     (item) => item.id !== track.id,
   );
 

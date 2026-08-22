@@ -21,5 +21,5 @@ export default async function PlaylistsPage() {
     );
   }
 
-  return <PlaylistManager initialPlaylists={listPlaylists(user.id)} />;
+  return <PlaylistManager initialPlaylists={await listPlaylists(user.id)} />;
 }

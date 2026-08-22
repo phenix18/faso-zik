@@ -18,17 +18,17 @@ export async function GET() {
   const user = await currentUser();
   if (!user) return fail("Connexion requise.", 401);
 
-  const artiste = getArtistByUserId(user.id);
+  const artiste = await getArtistByUserId(user.id);
   if (!artiste) return json({ albums: [] });
 
-  return json({ albums: albumsArtiste(artiste.id) });
+  return json({ albums: await albumsArtiste(artiste.id) });
 }
 
 export async function POST(request) {
   const user = await currentUser();
   if (!user) return fail("Connexion requise.", 401);
 
-  const artiste = getArtistByUserId(user.id);
+  const artiste = await getArtistByUserId(user.id);
   if (!artiste) return fail("Ce compte n'est pas un compte artiste.", 403);
 
   let corps;
@@ -40,5 +40,5 @@ export async function POST(request) {
 
   if (corps.kind && !typeAlbumValide(corps.kind)) return fail("Type d'album inconnu.", 422);
 
-  return json({ album: creerAlbum({ artistId: artiste.id, ...corps }) }, 201);
+  return json({ album: await creerAlbum({ artistId: artiste.id, ...corps }) }, 201);
 }

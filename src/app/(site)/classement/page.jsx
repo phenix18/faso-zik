@@ -7,8 +7,8 @@ export const metadata = {
   description: "Les titres les plus ecoutes des sept derniers jours sur FASO-ZIK.",
 };
 
-export default function ClassementPage() {
-  const titres = classementSemaine(30);
+export default async function ClassementPage() {
+  const titres = await classementSemaine(30);
 
   return (
     <div className="flex flex-col gap-5">

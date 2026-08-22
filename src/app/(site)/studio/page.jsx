@@ -33,17 +33,17 @@ export default async function StudioPage() {
     );
   }
 
-  const artist = getArtistByUserId(user.id);
+  const artist = await getArtistByUserId(user.id);
   if (!artist) return <OpenArtistSpace defaultName={user.name} />;
 
   return (
     <StudioClient
       artist={artist}
-      initialTracks={listTracks({ artistId: artist.id, includeUnpublished: true, limit: 200 })}
-      stats={artistStats(artist.id)}
-      revenus={revenusArtiste(artist.id)}
-      paiements={paiementsArtiste(artist.id, 30)}
-      albums={albumsArtiste(artist.id)}
+      initialTracks={await listTracks({ artistId: artist.id, includeUnpublished: true, limit: 200 })}
+      stats={await artistStats(artist.id)}
+      revenus={await revenusArtiste(artist.id)}
+      paiements={await paiementsArtiste(artist.id, 30)}
+      albums={await albumsArtiste(artist.id)}
     />
   );
 }

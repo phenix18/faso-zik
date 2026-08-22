@@ -6,52 +6,66 @@ import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 let compteur = 0;
 const cle = () => `test-${compteur++}`;
 
-test("les appels sous la limite passent", () => {
+test("les appels sous la limite passent", async () => {
   const k = cle();
   const options = { limit: 3, windowMs: 10_000 };
-  assert.deepEqual(
-    [1, 2, 3].map(() => rateLimit(k, options).allowed),
-    [true, true, true],
-  );
+  const resultats = [];
+  for (let index = 0; index < 3; index += 1) {
+    resultats.push((await rateLimit(k, options)).allowed);
+  }
+  assert.deepEqual(resultats, [true, true, true]);
 });
 
-test("l'appel de trop est refuse, avec un delai a attendre", () => {
+test("l'appel de trop est refuse, avec un delai a attendre", async () => {
   const k = cle();
   const options = { limit: 2, windowMs: 10_000 };
-  rateLimit(k, options);
-  rateLimit(k, options);
-  const refus = rateLimit(k, options);
+  await rateLimit(k, options);
+  await rateLimit(k, options);
+  const refus = await rateLimit(k, options);
 
   assert.equal(refus.allowed, false);
   assert.equal(refus.remaining, 0);
   assert.ok(refus.retryAfter > 0 && refus.retryAfter <= 10);
 });
 
-test("le decompte restant est renvoye", () => {
+test("le decompte restant est renvoye", async () => {
   const k = cle();
   const options = { limit: 3, windowMs: 10_000 };
-  assert.equal(rateLimit(k, options).remaining, 2);
-  assert.equal(rateLimit(k, options).remaining, 1);
-  assert.equal(rateLimit(k, options).remaining, 0);
+  assert.equal((await rateLimit(k, options)).remaining, 2);
+  assert.equal((await rateLimit(k, options)).remaining, 1);
+  assert.equal((await rateLimit(k, options)).remaining, 0);
 });
 
 test("la fenetre expiree remet le compteur a zero", async () => {
   const k = cle();
-  const options = { limit: 1, windowMs: 60 };
-  assert.equal(rateLimit(k, options).allowed, true);
-  assert.equal(rateLimit(k, options).allowed, false);
+  const options = { limit: 1, windowMs: 1000 };
+  assert.equal((await rateLimit(k, options)).allowed, true);
+  assert.equal((await rateLimit(k, options)).allowed, false);
 
-  await new Promise((resolve) => setTimeout(resolve, 90));
-  assert.equal(rateLimit(k, options).allowed, true);
+  await new Promise((resoudre) => setTimeout(resoudre, 1300));
+  assert.equal((await rateLimit(k, options)).allowed, true);
 });
 
-test("deux cles differentes ne se genent pas", () => {
+test("deux cles differentes ne se genent pas", async () => {
   const options = { limit: 1, windowMs: 10_000 };
   const a = cle();
   const b = cle();
-  rateLimit(a, options);
-  assert.equal(rateLimit(a, options).allowed, false);
-  assert.equal(rateLimit(b, options).allowed, true);
+  await rateLimit(a, options);
+
+  assert.equal((await rateLimit(a, options)).allowed, false);
+  assert.equal((await rateLimit(b, options)).allowed, true);
+});
+
+test("le compteur tient entre deux appels : c'est le point de la table", async () => {
+  // En memoire, deux instances auraient chacune le sien et la limite serait
+  // multipliee par leur nombre.
+  const k = cle();
+  const options = { limit: 5, windowMs: 10_000 };
+  for (let index = 0; index < 5; index += 1) await rateLimit(k, options);
+
+  const { execute } = await import("@/lib/db");
+  const efface = await execute("DELETE FROM rate_limits WHERE cle = $1 AND compte >= 5", [k]);
+  assert.equal(efface, 1, "le compte a bien ete enregistre en base");
 });
 
 test("l'adresse retenue est le premier maillon de x-forwarded-for", () => {

@@ -17,7 +17,7 @@ const schema = z.object({ email: z.string().email() });
  * differemment reviendrait a offrir un moyen de savoir qui est inscrit.
  */
 export async function POST(request) {
-  const limite = rateLimit(clientKey(request, "oubli"), { limit: 5, windowMs: 60 * 60 * 1000 });
+  const limite = await rateLimit(clientKey(request, "oubli"), { limit: 5, windowMs: 60 * 60 * 1000 });
   if (!limite.allowed) {
     return tooManyRequests(limite.retryAfter, "Trop de demandes. Reessayez plus tard.");
   }
@@ -36,11 +36,11 @@ export async function POST(request) {
     return fail("Adresse e-mail invalide.", 422);
   }
 
-  purgerJetonsExpires();
-  const compte = findUserByEmail(corps.email);
+  await purgerJetonsExpires();
+  const compte = await findUserByEmail(corps.email);
 
   if (compte) {
-    const { jeton, dureeMinutes } = creerJetonReinitialisation(compte.id);
+    const { jeton, dureeMinutes } = await creerJetonReinitialisation(compte.id);
     const base = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
 
     try {

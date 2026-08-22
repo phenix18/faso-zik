@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { execute, query, unique } from "@/lib/db";
 import { newId, slugify } from "@/lib/ids";
 import { toPublicTrack } from "@/lib/repo/tracks";
 
@@ -14,87 +14,87 @@ export function typeAlbumValide(code) {
   return TYPES_ALBUM.some((type) => type.code === code);
 }
 
-function slugUnique(artistId, titre) {
-  const db = getDb();
+async function slugUnique(artistId, titre) {
   const base = slugify(titre);
   let slug = base;
   let n = 2;
-  while (db.prepare("SELECT 1 FROM albums WHERE artist_id = ? AND slug = ?").get(artistId, slug)) {
+  while (await unique("SELECT 1 FROM albums WHERE artist_id = $1 AND slug = $2", [artistId, slug])) {
     slug = `${base}-${n++}`;
   }
   return slug;
 }
 
-export function creerAlbum({ artistId, titre, kind = "album", description, coverUrl, releasedOn }) {
+const SELECT_ALBUM = `
+  SELECT a.*, ar.name AS artist_name, ar.slug AS artist_slug,
+         (SELECT COUNT(*)::int FROM tracks t WHERE t.album_id = a.id AND t.published) AS titres,
+         (SELECT COALESCE(SUM(t.duration), 0)::int FROM tracks t WHERE t.album_id = a.id AND t.published) AS duree
+    FROM albums a JOIN artists ar ON ar.id = a.artist_id
+`;
+
+export async function creerAlbum({ artistId, titre, kind = "album", description, coverUrl, releasedOn }) {
   const id = newId("alb");
-  getDb()
-    .prepare(
-      `INSERT INTO albums (id, artist_id, title, slug, kind, description, cover_url, released_on)
-       VALUES (?,?,?,?,?,?,?,?)`,
-    )
-    .run(
+  await execute(
+    `INSERT INTO albums (id, artist_id, title, slug, kind, description, cover_url, released_on)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [
       id,
       artistId,
       titre,
-      slugUnique(artistId, titre),
+      await slugUnique(artistId, titre),
       typeAlbumValide(kind) ? kind : "album",
       description || null,
       coverUrl || null,
       releasedOn || null,
-    );
+    ],
+  );
   return albumParId(id);
 }
 
-const SELECT_ALBUM = `
-  SELECT a.*, ar.name AS artist_name, ar.slug AS artist_slug,
-         (SELECT COUNT(*) FROM tracks t WHERE t.album_id = a.id AND t.published = 1) AS titres,
-         (SELECT COALESCE(SUM(t.duration), 0) FROM tracks t WHERE t.album_id = a.id AND t.published = 1) AS duree
-    FROM albums a JOIN artists ar ON ar.id = a.artist_id
-`;
-
-export function albumParId(id) {
-  return getDb().prepare(`${SELECT_ALBUM} WHERE a.id = ?`).get(id);
+export async function albumParId(id) {
+  if (!id) return null;
+  return unique(`${SELECT_ALBUM} WHERE a.id = $1`, [id]);
 }
 
-export function albumParSlug(artistSlug, slug) {
-  return getDb().prepare(`${SELECT_ALBUM} WHERE ar.slug = ? AND a.slug = ?`).get(artistSlug, slug);
+export async function albumParSlug(artistSlug, slug) {
+  return unique(`${SELECT_ALBUM} WHERE ar.slug = $1 AND a.slug = $2`, [artistSlug, slug]);
 }
 
-export function albumsArtiste(artistId, { inclureVides = true } = {}) {
-  const albums = getDb()
-    .prepare(`${SELECT_ALBUM} WHERE a.artist_id = ? ORDER BY a.released_on DESC, a.created_at DESC`)
-    .all(artistId);
-
+export async function albumsArtiste(artistId, { inclureVides = true } = {}) {
+  const albums = await query(
+    `${SELECT_ALBUM} WHERE a.artist_id = $1 ORDER BY a.released_on DESC NULLS LAST, a.created_at DESC`,
+    [artistId],
+  );
   return inclureVides ? albums : albums.filter((album) => album.titres > 0);
 }
 
 /** Titres d'un album, dans l'ordre voulu par l'artiste. */
-export function titresAlbum(albumId, { includeUnpublished = false } = {}) {
-  return getDb()
-    .prepare(
-      `SELECT t.*, ar.name AS artist_name, ar.slug AS artist_slug,
-              ar.photo_url AS artist_photo, ar.verified AS artist_verified
-         FROM tracks t JOIN artists ar ON ar.id = t.artist_id
-        WHERE t.album_id = ? ${includeUnpublished ? "" : "AND t.published = 1"}
-        ORDER BY COALESCE(t.track_no, 9999), t.created_at`,
-    )
-    .all(albumId)
-    .map(toPublicTrack);
+export async function titresAlbum(albumId, { includeUnpublished = false } = {}) {
+  const lignes = await query(
+    `SELECT t.*, ar.name AS artist_name, ar.slug AS artist_slug,
+            ar.photo_url AS artist_photo, ar.verified AS artist_verified,
+            al.title AS album_title, al.slug AS album_slug, al.cover_url AS album_cover
+       FROM tracks t
+       JOIN artists ar ON ar.id = t.artist_id
+       LEFT JOIN albums al ON al.id = t.album_id
+      WHERE t.album_id = $1 ${includeUnpublished ? "" : "AND t.published"}
+      ORDER BY COALESCE(t.track_no, 9999), t.created_at`,
+    [albumId],
+  );
+  return lignes.map(toPublicTrack);
 }
 
 /** Derniers albums publies, pour l'accueil. */
-export function albumsRecents(limite = 8) {
-  return getDb()
-    .prepare(
-      `${SELECT_ALBUM}
-        WHERE a.published = 1
-          AND (SELECT COUNT(*) FROM tracks t WHERE t.album_id = a.id AND t.published = 1) > 0
-        ORDER BY a.created_at DESC LIMIT ?`,
-    )
-    .all(limite);
+export async function albumsRecents(limite = 8) {
+  return query(
+    `${SELECT_ALBUM}
+      WHERE a.published
+        AND (SELECT COUNT(*) FROM tracks t WHERE t.album_id = a.id AND t.published) > 0
+      ORDER BY a.created_at DESC LIMIT $1`,
+    [limite],
+  );
 }
 
-export function modifierAlbum(id, champs) {
+export async function modifierAlbum(id, champs) {
   const correspondance = {
     titre: "title",
     description: "description",
@@ -109,22 +109,23 @@ export function modifierAlbum(id, champs) {
   );
   if (!entrees.length) return albumParId(id);
 
-  const sql = entrees.map(([cle]) => `${correspondance[cle]} = ?`).join(", ");
-  const valeurs = entrees.map(([cle, valeur]) =>
-    cle === "published" ? (valeur ? 1 : 0) : valeur,
-  );
-  getDb().prepare(`UPDATE albums SET ${sql} WHERE id = ?`).run(...valeurs, id);
+  const sql = entrees.map(([cle], index) => `${correspondance[cle]} = $${index + 1}`).join(", ");
+  const valeurs = entrees.map(([cle, valeur]) => (cle === "published" ? !!valeur : valeur));
+
+  await execute(`UPDATE albums SET ${sql} WHERE id = $${entrees.length + 1}`, [...valeurs, id]);
   return albumParId(id);
 }
 
-export function supprimerAlbum(id) {
+export async function supprimerAlbum(id) {
   // Les titres survivent a leur album : ils redeviennent simplement isoles.
-  getDb().prepare("DELETE FROM albums WHERE id = ?").run(id);
+  await execute("DELETE FROM albums WHERE id = $1", [id]);
 }
 
 /** Rattache un titre a un album, ou l'en detache si albumId vaut null. */
-export function rattacherTitre(trackId, albumId, trackNo = null) {
-  getDb()
-    .prepare("UPDATE tracks SET album_id = ?, track_no = ? WHERE id = ?")
-    .run(albumId, trackNo, trackId);
+export async function rattacherTitre(trackId, albumId, trackNo = null) {
+  await execute("UPDATE tracks SET album_id = $1, track_no = $2 WHERE id = $3", [
+    albumId,
+    trackNo,
+    trackId,
+  ]);
 }

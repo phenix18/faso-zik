@@ -3,70 +3,150 @@
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { HiCloudArrowUp } from "react-icons/hi2";
+import { dureeVideo, envoyerFichier, preparerAudio } from "@/lib/navigateur/encodage";
 import { formatSize } from "@/lib/format";
+
+const ETAPES = {
+  decodage: "Lecture du fichier",
+  analyse: "Mesure du tempo",
+  encodage: "Fabrication de la version d'ecoute",
+  envoi: "Envoi vers le stockage",
+  enregistrement: "Enregistrement du titre",
+};
 
 /**
  * Depot d'un titre ou d'un clip.
  *
- * L'envoi passe par XMLHttpRequest et non fetch : c'est le seul moyen d'avoir
- * une barre de progression fiable sur un fichier video de plusieurs centaines
- * de megaoctets.
+ * Le fichier ne passe pas par l'application : le navigateur prepare la version
+ * d'ecoute, demande des adresses d'envoi signees, depose directement au
+ * stockage, puis previent le serveur. C'est ce qui permet de deposer un clip
+ * de plusieurs centaines de megaoctets.
  */
 export default function UploadForm({ onPublished, albums = [] }) {
   const formRef = useRef(null);
   const [media, setMedia] = useState(null);
-  const [progress, setProgress] = useState(null);
+  const [etape, setEtape] = useState(null);
+  const [avancement, setAvancement] = useState(0);
 
-  function submit(event) {
-    event.preventDefault();
-    const form = new FormData(formRef.current);
-    if (!form.get("media")?.size) {
+  function avancer(nom, valeur) {
+    setEtape(nom);
+    setAvancement(Math.round(valeur * 100));
+  }
+
+  async function soumettre(evenement) {
+    evenement.preventDefault();
+    const formulaire = new FormData(formRef.current);
+    const fichier = formulaire.get("media");
+    const pochette = formulaire.get("cover");
+
+    if (!fichier?.size) {
       toast.error("Choisissez un fichier audio ou video.");
       return;
     }
-
-    // Les cases non cochees ne sont pas envoyees par le navigateur : on force
-    // la valeur pour que le serveur recoive un booleen explicite.
     if (!formRef.current.elements.rightsConfirmed.checked) {
       toast.error("Cochez la declaration de droits pour pouvoir publier.");
       return;
     }
 
-    for (const field of ["allowDownload", "allowDj", "published", "rightsConfirmed"]) {
-      form.set(field, formRef.current.elements[field].checked ? "true" : "false");
-    }
+    const kind = fichier.type.startsWith("video/") ? "video" : "audio";
 
-    const request = new XMLHttpRequest();
-    request.open("POST", "/api/upload");
-    request.upload.onprogress = (event) => {
-      if (event.lengthComputable) setProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    request.onload = () => {
-      setProgress(null);
-      let data = {};
-      try {
-        data = JSON.parse(request.responseText);
-      } catch {
-        /* reponse non JSON : message generique ci-dessous */
-      }
-      if (request.status >= 200 && request.status < 300) {
-        toast.success("Titre publie.");
-        onPublished?.(data.track);
-        formRef.current.reset();
-        setMedia(null);
+    try {
+      // 1. Preparation locale : duree, tempo, version d'ecoute.
+      let duree = 0;
+      let bpm = null;
+      let ecoute = null;
+
+      if (kind === "audio") {
+        const prepare = await preparerAudio(fichier, avancer);
+        duree = prepare.duree;
+        bpm = prepare.bpm;
+        ecoute = prepare.ecoute;
       } else {
-        toast.error(data.error || "Publication impossible.");
+        avancer("decodage", 0.1);
+        duree = await dureeVideo(fichier);
       }
-    };
-    request.onerror = () => {
-      setProgress(null);
-      toast.error("Envoi interrompu.");
-    };
-    request.send(form);
+
+      // 2. Adresses d'envoi, une par fichier.
+      avancer("envoi", 0);
+      const demandes = [
+        { role: "media", kind, mime: fichier.type, taille: fichier.size, nom: fichier.name },
+      ];
+      if (ecoute) {
+        demandes.push({ role: "ecoute", kind: "audio", mime: "audio/mpeg", taille: ecoute.size });
+      }
+      if (pochette?.size) {
+        demandes.push({
+          role: "pochette",
+          kind: "image",
+          mime: pochette.type,
+          taille: pochette.size,
+          nom: pochette.name,
+        });
+      }
+
+      const reponseAdresses = await fetch("/api/upload/adresse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fichiers: demandes }),
+      });
+      const { adresses, error } = await reponseAdresses.json();
+      if (!reponseAdresses.ok) throw new Error(error);
+
+      // 3. Envoi direct. L'original pese le plus : c'est lui qui rythme la barre.
+      await envoyerFichier(adresses.media.url, fichier, (part) => avancer("envoi", part * 0.9));
+      if (ecoute) await envoyerFichier(adresses.ecoute.url, ecoute);
+      if (pochette?.size) await envoyerFichier(adresses.pochette.url, pochette);
+
+      // 4. Enregistrement.
+      avancer("enregistrement", 1);
+      const reponse = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formulaire.get("title"),
+          kind,
+          mediaPath: adresses.media.chemin,
+          mediaMime: fichier.type,
+          mediaSize: fichier.size,
+          previewPath: adresses.ecoute?.chemin,
+          previewMime: ecoute ? "audio/mpeg" : undefined,
+          previewSize: ecoute?.size,
+          coverPath: adresses.pochette?.chemin,
+          duration: duree,
+          bpm: formulaire.get("bpm") ? Number(formulaire.get("bpm")) : bpm,
+          genre: formulaire.get("genre") || undefined,
+          language: formulaire.get("language") || undefined,
+          description: formulaire.get("description") || undefined,
+          musicKey: formulaire.get("musicKey") || undefined,
+          license: formulaire.get("license") || undefined,
+          priceCfa: Number(formulaire.get("priceCfa")) || 0,
+          albumId: formulaire.get("albumId") || undefined,
+          trackNo: formulaire.get("trackNo") ? Number(formulaire.get("trackNo")) : null,
+          allowDownload: formRef.current.elements.allowDownload.checked,
+          allowDj: formRef.current.elements.allowDj.checked,
+          published: formRef.current.elements.published.checked,
+          rightsConfirmed: true,
+        }),
+      });
+      const donnees = await reponse.json();
+      if (!reponse.ok) throw new Error(donnees.error);
+
+      toast.success(
+        bpm ? `Titre publie. Tempo mesure : ${bpm} BPM.` : "Titre publie.",
+      );
+      onPublished?.(donnees.track);
+      formRef.current.reset();
+      setMedia(null);
+    } catch (erreur) {
+      toast.error(erreur.message || "Publication impossible.");
+    } finally {
+      setEtape(null);
+      setAvancement(0);
+    }
   }
 
   return (
-    <form ref={formRef} onSubmit={submit} className="card flex max-w-3xl flex-col gap-4">
+    <form ref={formRef} onSubmit={soumettre} className="card flex max-w-3xl flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="media">
@@ -78,13 +158,15 @@ export default function UploadForm({ onPublished, albums = [] }) {
             type="file"
             required
             accept="audio/*,video/mp4,video/webm,video/quicktime"
-            onChange={(event) => setMedia(event.target.files?.[0] || null)}
+            onChange={(evenement) => setMedia(evenement.target.files?.[0] || null)}
             className="input file:mr-3 file:rounded file:border-0 file:bg-faso-gold file:px-3 file:py-1 file:text-xs file:font-bold file:text-black"
           />
           {media && (
             <p className="mt-1 text-[11px] text-white/40">
               {media.name} · {formatSize(media.size)} ·{" "}
-              {media.type.startsWith("video/") ? "clip video" : "audio"}
+              {media.type.startsWith("video/")
+                ? "clip video"
+                : "audio — une version d'ecoute allegee sera fabriquee ici"}
             </p>
           )}
         </div>
@@ -127,7 +209,7 @@ export default function UploadForm({ onPublished, albums = [] }) {
             <label className="label" htmlFor="bpm">
               BPM
             </label>
-            <input id="bpm" name="bpm" type="number" min="30" max="300" className="input" />
+            <input id="bpm" name="bpm" type="number" min="30" max="300" placeholder="mesure" className="input" />
           </div>
           <div>
             <label className="label" htmlFor="musicKey">
@@ -136,13 +218,6 @@ export default function UploadForm({ onPublished, albums = [] }) {
             <input id="musicKey" name="musicKey" placeholder="Am" className="input" />
           </div>
         </div>
-      </div>
-
-      <div>
-        <label className="label" htmlFor="description">
-          Description
-        </label>
-        <textarea id="description" name="description" rows={3} className="input" />
       </div>
 
       {albums.length > 0 && (
@@ -169,6 +244,13 @@ export default function UploadForm({ onPublished, albums = [] }) {
         </div>
       )}
 
+      <div>
+        <label className="label" htmlFor="description">
+          Description
+        </label>
+        <textarea id="description" name="description" rows={3} className="input" />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="license">
@@ -180,15 +262,7 @@ export default function UploadForm({ onPublished, albums = [] }) {
           <label className="label" htmlFor="priceCfa">
             Prix du telechargement (F CFA)
           </label>
-          <input
-            id="priceCfa"
-            name="priceCfa"
-            type="number"
-            min="0"
-            step="100"
-            defaultValue="0"
-            className="input"
-          />
+          <input id="priceCfa" name="priceCfa" type="number" min="0" step="100" defaultValue="0" className="input" />
           <p className="mt-1 text-[11px] text-white/35">
             Zero rend le telechargement gratuit, si vous l&apos;autorisez ci-dessous.
           </p>
@@ -208,8 +282,8 @@ export default function UploadForm({ onPublished, albums = [] }) {
           />
           <span className="text-sm text-white/75">
             Je declare detenir les droits sur cet enregistrement, ou l&apos;autorisation ecrite de
-            ceux qui les detiennent, et j&apos;accepte qu&apos;il soit retire en cas de
-            reclamation fondee.{" "}
+            ceux qui les detiennent, et j&apos;accepte qu&apos;il soit retire en cas de reclamation
+            fondee.{" "}
             <a href="/droits" target="_blank" className="text-faso-gold hover:underline">
               Lire la procedure
             </a>
@@ -230,35 +304,37 @@ export default function UploadForm({ onPublished, albums = [] }) {
             ["published", "Mettre en ligne tout de suite", true],
             ["allowDownload", "Autoriser le telechargement du fichier", false],
             ["allowDj", "Autoriser l'usage dans la platine DJ du site", false],
-          ].map(([name, label, defaultChecked]) => (
-            <label key={name} className="flex cursor-pointer items-center gap-2">
+          ].map(([nom, libelle, cocheParDefaut]) => (
+            <label key={nom} className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
-                name={name}
-                defaultChecked={defaultChecked}
+                name={nom}
+                defaultChecked={cocheParDefaut}
                 className="h-4 w-4 accent-faso-gold"
               />
-              <span className="text-sm text-white/75">{label}</span>
+              <span className="text-sm text-white/75">{libelle}</span>
             </label>
           ))}
         </div>
       </fieldset>
 
-      {progress !== null && (
+      {etape && (
         <div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-faso-gold transition-all"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${avancement}%` }}
             />
           </div>
-          <p className="mt-1 text-xs text-white/45">Envoi : {progress} %</p>
+          <p className="mt-1 text-xs text-white/45">
+            {ETAPES[etape]} — {avancement} %
+          </p>
         </div>
       )}
 
-      <button type="submit" disabled={progress !== null} className="btn-primary self-start">
+      <button type="submit" disabled={!!etape} className="btn-primary self-start">
         <HiCloudArrowUp className="text-lg" />
-        {progress !== null ? "Envoi en cours..." : "Publier"}
+        {etape ? "En cours..." : "Publier"}
       </button>
     </form>
   );

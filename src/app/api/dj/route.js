@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { query } from "@/lib/db";
 import { toPublicTrack } from "@/lib/repo/tracks";
 import { json } from "@/lib/http";
 
@@ -7,24 +7,25 @@ export const dynamic = "force-dynamic";
 
 /**
  * Bac a disques de la platine : uniquement les titres dont l'artiste a
- * autorise l'usage en mix (allow_dj).
+ * autorise l'usage en mix.
  */
 export async function GET(request) {
-  const search = new URL(request.url).searchParams.get("q") || "";
-  const like = `%${search.trim()}%`;
+  const recherche = new URL(request.url).searchParams.get("q") || "";
+  const terme = recherche.trim();
 
-  const rows = getDb()
-    .prepare(
-      `SELECT t.*, a.name AS artist_name, a.slug AS artist_slug,
-              a.photo_url AS artist_photo, a.verified AS artist_verified
-         FROM tracks t JOIN artists a ON a.id = t.artist_id
-        WHERE t.published = 1 AND t.allow_stream = 1 AND t.allow_dj = 1
-          AND t.kind = 'audio'
-          AND (? = '' OR t.title LIKE ? OR a.name LIKE ? OR t.genre LIKE ?)
-        ORDER BY t.plays DESC, t.created_at DESC
-        LIMIT 120`,
-    )
-    .all(search.trim(), like, like, like);
+  const rows = await query(
+    `SELECT t.*, a.name AS artist_name, a.slug AS artist_slug,
+            a.photo_url AS artist_photo, a.verified AS artist_verified,
+            al.title AS album_title, al.slug AS album_slug, al.cover_url AS album_cover
+       FROM tracks t
+       JOIN artists a ON a.id = t.artist_id
+       LEFT JOIN albums al ON al.id = t.album_id
+      WHERE t.published AND t.allow_stream AND t.allow_dj AND t.kind = 'audio'
+        AND ($1 = '' OR t.title ILIKE $2 OR a.name ILIKE $2 OR t.genre ILIKE $2)
+      ORDER BY t.plays DESC, t.created_at DESC
+      LIMIT 120`,
+    [terme, `%${terme}%`],
+  );
 
   return json({ tracks: rows.map(toPublicTrack), total: rows.length });
 }

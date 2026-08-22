@@ -15,7 +15,7 @@ export const authOptions = {
         password: { label: "Mot de passe", type: "password" },
       },
       async authorize(credentials) {
-        const user = findUserByEmail(credentials?.email);
+        const user = await findUserByEmail(credentials?.email);
         if (!user || !verifyPassword(user, credentials?.password || "")) return null;
         return { id: user.id, name: user.name, email: user.email, role: user.role };
       },
@@ -27,9 +27,9 @@ export const authOptions = {
       if (token.uid) {
         // Le role et la fiche artiste peuvent changer en cours de session
         // (passage auditeur -> artiste) : on les relit a chaque rafraichissement.
-        const fresh = findUserById(token.uid);
+        const fresh = await findUserById(token.uid);
         token.role = fresh?.role || "auditeur";
-        token.artistId = getArtistByUserId(token.uid)?.id || null;
+        token.artistId = await getArtistByUserId(token.uid)?.id || null;
       }
       return token;
     },
@@ -54,5 +54,5 @@ export async function currentUser() {
 export async function currentArtist() {
   const user = await currentUser();
   if (!user) return null;
-  return getArtistByUserId(user.id) || null;
+  return await getArtistByUserId(user.id) || null;
 }

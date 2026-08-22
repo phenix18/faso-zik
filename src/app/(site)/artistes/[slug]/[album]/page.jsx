@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 
 const LIBELLES = { album: "Album", ep: "EP", single: "Single", compilation: "Compilation" };
 
-export function generateMetadata({ params }) {
-  const album = albumParSlug(params.slug, params.album);
+export async function generateMetadata({ params }) {
+  const album = await albumParSlug(params.slug, params.album);
   if (!album) return { title: "Album introuvable" };
 
   const description =
@@ -33,11 +33,11 @@ export function generateMetadata({ params }) {
   };
 }
 
-export default function AlbumPage({ params }) {
-  const album = albumParSlug(params.slug, params.album);
+export default async function AlbumPage({ params }) {
+  const album = await albumParSlug(params.slug, params.album);
   if (!album || !album.published) notFound();
 
-  const titres = titresAlbum(album.id);
+  const titres = await titresAlbum(album.id);
 
   const donneesStructurees = {
     "@context": "https://schema.org",

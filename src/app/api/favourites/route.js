@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await currentUser();
   if (!user) return fail("Connexion requise.", 401);
-  return json({ tracks: listFavourites(user.id) });
+  return json({ tracks: await listFavourites(user.id) });
 }
 
 export async function POST(request) {
@@ -18,5 +18,5 @@ export async function POST(request) {
   const { trackId } = await request.json();
   if (!trackId) return fail("Identifiant de morceau manquant.", 422);
 
-  return json({ favourite: toggleFavourite(user.id, trackId) });
+  return json({ favourite: await toggleFavourite(user.id, trackId) });
 }

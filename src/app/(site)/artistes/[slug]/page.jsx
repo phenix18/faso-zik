@@ -18,8 +18,8 @@ import { formatCount } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }) {
-  const artist = getArtistBySlug(params.slug);
+export async function generateMetadata({ params }) {
+  const artist = await getArtistBySlug(params.slug);
   if (!artist) return { title: "Artiste introuvable" };
 
   const description =
@@ -43,17 +43,17 @@ export function generateMetadata({ params }) {
 }
 
 export default async function ArtistPage({ params }) {
-  const artist = getArtistBySlug(params.slug);
+  const artist = await getArtistBySlug(params.slug);
   if (!artist) notFound();
 
   const user = await currentUser();
 
-  const tracks = listTracks({ artistId: artist.id, limit: 200 });
-  const albums = albumsArtiste(artist.id, { inclureVides: false }).filter((album) => album.published);
+  const tracks = await listTracks({ artistId: artist.id, limit: 200 });
+  const albums = await albumsArtiste(artist.id, { inclureVides: false }).filter((album) => album.published);
   // Les titres deja ranges dans un album sont presentes avec lui.
   const audios = tracks.filter((track) => track.kind === "audio" && !track.album);
   const videos = tracks.filter((track) => track.kind === "video");
-  const stats = artistStats(artist.id);
+  const stats = await artistStats(artist.id);
 
   const donneesStructurees = {
     "@context": "https://schema.org",
@@ -106,8 +106,8 @@ export default async function ArtistPage({ params }) {
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
             <BoutonAbonnement
               artistId={artist.id}
-              initial={suit(user?.id, artist.id)}
-              abonnes={nombreAbonnes(artist.id)}
+              initial={await suit(user?.id, artist.id)}
+              abonnes={await nombreAbonnes(artist.id)}
             />
           </div>
           <SoutenirArtiste artist={{ id: artist.id, name: artist.name }} />

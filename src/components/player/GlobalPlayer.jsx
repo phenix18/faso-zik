@@ -68,7 +68,7 @@ export default function GlobalPlayer() {
   const isVideo = current?.kind === "video";
 
   // Choix du flux (fichier complet ou HLS) selon le morceau et le navigateur.
-  useMediaSource(mediaRef, current, { dataSaver, shouldPlay: isPlaying });
+  useMediaSource(mediaRef, current, { shouldPlay: isPlaying });
 
   // La preference d'economie de donnees appartient a l'appareil, pas au compte :
   // le meme auditeur la veut sur son telephone et pas sur son ordinateur.

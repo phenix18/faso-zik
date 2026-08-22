@@ -14,11 +14,11 @@ const schema = z.object({
 /** Verifie qu'un lien est encore valable, avant d'afficher le formulaire. */
 export async function GET(request) {
   const jeton = new URL(request.url).searchParams.get("jeton") || "";
-  return json({ valide: !!comptePourJeton(jeton) });
+  return json({ valide: !!await comptePourJeton(jeton) });
 }
 
 export async function POST(request) {
-  const limite = rateLimit(clientKey(request, "reinit"), { limit: 10, windowMs: 15 * 60 * 1000 });
+  const limite = await rateLimit(clientKey(request, "reinit"), { limit: 10, windowMs: 15 * 60 * 1000 });
   if (!limite.allowed) {
     return tooManyRequests(limite.retryAfter, "Trop de tentatives. Reessayez plus tard.");
   }
@@ -30,7 +30,7 @@ export async function POST(request) {
     return fail(erreur.errors?.[0]?.message || "Donnees invalides.", 422);
   }
 
-  if (!appliquerReinitialisation(corps.jeton, corps.motDePasse)) {
+  if (!await appliquerReinitialisation(corps.jeton, corps.motDePasse)) {
     return fail("Ce lien a expire ou a deja servi. Demandez-en un nouveau.", 410);
   }
 

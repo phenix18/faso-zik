@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Sortie autonome : l'image de production n'embarque que les dependances
-  // reellement tracees, au lieu de tout node_modules.
-  output: "standalone",
   experimental: {
-    serverComponentsExternalPackages: ["better-sqlite3", "music-metadata"],
+    // Pilotes de base : ils ne doivent pas etre embarques dans le bundle.
+    // PGlite embarque un binaire WebAssembly, que le traceur ne sait pas
+    // suivre ; postgres ouvre des connexions reseau natives.
+    serverComponentsExternalPackages: ["postgres", "@electric-sql/pglite"],
   },
   async headers() {
     return [

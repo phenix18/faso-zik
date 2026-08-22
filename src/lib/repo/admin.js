@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { execute, query, unique } from "@/lib/db";
 
 /**
  * Operations reservees a l'administration.
@@ -7,42 +7,37 @@ import { getDb } from "@/lib/db";
  * une seule fois, avant d'appeler ces fonctions.
  */
 
-export function vueEnsemble() {
-  const db = getDb();
-  const compte = (requete) => db.prepare(requete).get().n;
-
-  return {
-    artistes: compte("SELECT COUNT(*) AS n FROM artists"),
-    artistesVerifies: compte("SELECT COUNT(*) AS n FROM artists WHERE verified = 1"),
-    titres: compte("SELECT COUNT(*) AS n FROM tracks"),
-    titresEnLigne: compte("SELECT COUNT(*) AS n FROM tracks WHERE published = 1"),
-    comptes: compte("SELECT COUNT(*) AS n FROM users"),
-    ecoutes7j: compte(
-      "SELECT COUNT(*) AS n FROM events WHERE type = 'play' AND created_at >= datetime('now','-7 days')",
-    ),
-    paiements: compte("SELECT COUNT(*) AS n FROM payments WHERE status = 'paye'"),
-  };
+export async function vueEnsemble() {
+  const ligne = await unique(`
+    SELECT
+      (SELECT COUNT(*)::int FROM artists)                       AS artistes,
+      (SELECT COUNT(*)::int FROM artists WHERE verified)        AS "artistesVerifies",
+      (SELECT COUNT(*)::int FROM tracks)                        AS titres,
+      (SELECT COUNT(*)::int FROM tracks WHERE published)        AS "titresEnLigne",
+      (SELECT COUNT(*)::int FROM users)                         AS comptes,
+      (SELECT COUNT(*)::int FROM events
+        WHERE type = 'play' AND created_at >= now() - interval '7 days') AS "ecoutes7j",
+      (SELECT COUNT(*)::int FROM payments WHERE status = 'paye') AS paiements
+  `);
+  return ligne;
 }
 
-export function listeArtistes() {
-  return getDb()
-    .prepare(
-      `SELECT a.*, u.email,
-              (SELECT COUNT(*) FROM tracks t WHERE t.artist_id = a.id) AS titres
-         FROM artists a LEFT JOIN users u ON u.id = a.user_id
-        ORDER BY a.verified DESC, a.created_at DESC`,
-    )
-    .all();
+export async function listeArtistes() {
+  return query(
+    `SELECT a.*, u.email,
+            (SELECT COUNT(*)::int FROM tracks t WHERE t.artist_id = a.id) AS titres
+       FROM artists a LEFT JOIN users u ON u.id = a.user_id
+      ORDER BY a.verified DESC, a.created_at DESC`,
+  );
 }
 
-export function basculerVerification(artistId) {
-  const db = getDb();
-  const artiste = db.prepare("SELECT verified FROM artists WHERE id = ?").get(artistId);
+export async function basculerVerification(artistId) {
+  const artiste = await unique("SELECT verified FROM artists WHERE id = $1", [artistId]);
   if (!artiste) return null;
 
-  const nouvelEtat = artiste.verified ? 0 : 1;
-  db.prepare("UPDATE artists SET verified = ? WHERE id = ?").run(nouvelEtat, artistId);
-  return !!nouvelEtat;
+  const nouvelEtat = !artiste.verified;
+  await execute("UPDATE artists SET verified = $1 WHERE id = $2", [nouvelEtat, artistId]);
+  return nouvelEtat;
 }
 
 /**
@@ -51,16 +46,15 @@ export function basculerVerification(artistId) {
  * On depublie plutot que de supprimer : une reclamation peut etre infondee, et
  * le fichier de l'artiste ne doit pas disparaitre pour autant.
  */
-export function retirerTitre(trackId) {
-  getDb().prepare("UPDATE tracks SET published = 0 WHERE id = ?").run(trackId);
+export async function retirerTitre(trackId) {
+  await execute("UPDATE tracks SET published = FALSE WHERE id = $1", [trackId]);
 }
 
-export function derniersTitres(limite = 40) {
-  return getDb()
-    .prepare(
-      `SELECT t.id, t.title, t.kind, t.published, t.created_at, a.name AS artiste, a.slug
-         FROM tracks t JOIN artists a ON a.id = t.artist_id
-        ORDER BY t.created_at DESC LIMIT ?`,
-    )
-    .all(limite);
+export async function derniersTitres(limite = 40) {
+  return query(
+    `SELECT t.id, t.title, t.kind, t.published, t.created_at, a.name AS artiste, a.slug
+       FROM tracks t JOIN artists a ON a.id = t.artist_id
+      ORDER BY t.created_at DESC LIMIT $1`,
+    [limite],
+  );
 }

@@ -7,11 +7,6 @@ import { HiTrash, HiVideoCamera } from "react-icons/hi2";
 import Cover from "@/components/Cover";
 import { formatCount, formatDuration, formatSize } from "@/lib/format";
 
-const TRANSCODAGE = {
-  attente: ["Version allegee en attente", "text-white/40"],
-  encours: ["Version allegee en cours", "text-faso-gold"],
-  echec: ["Version allegee : echec, l'original est diffuse", "text-faso-red"],
-};
 
 const SWITCHES = [
   ["published", "En ligne", "Le titre apparait dans le catalogue public."],
@@ -103,11 +98,6 @@ export default function TrackManagerRow({ track, onChange, onDelete }) {
             )}{" "}
             · {formatCount(track.plays)} ecoutes · {formatCount(track.downloads)} telechargements
           </p>
-          {TRANSCODAGE[track.transcodeStatus] && (
-            <p className={`truncate text-[11px] ${TRANSCODAGE[track.transcodeStatus][1]}`}>
-              {TRANSCODAGE[track.transcodeStatus][0]}
-            </p>
-          )}
         </div>
       </div>
 

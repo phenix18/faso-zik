@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { query } from "@/lib/db";
 import { SITE_URL } from "@/lib/siteConfig";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +9,7 @@ export const dynamic = "force-dynamic";
  * Genere a la demande plutot que fige a la construction : le catalogue change
  * chaque fois qu'un artiste publie, et un plan obsolete ne sert a rien.
  */
-export default function sitemap() {
-  const db = getDb();
+export default async function sitemap() {
 
   const pages = [
     ["", 1, "daily"],
@@ -27,25 +26,25 @@ export default function sitemap() {
     priority,
   }));
 
-  const artistes = db
-    .prepare("SELECT slug, created_at FROM artists ORDER BY created_at DESC LIMIT 5000")
-    .all()
-    .map((artiste) => ({
+  const lignesArtistes = await query(
+    "SELECT slug, created_at FROM artists ORDER BY created_at DESC LIMIT 5000",
+  );
+  const artistes = lignesArtistes.map((artiste) => ({
       url: `${SITE_URL}/artistes/${artiste.slug}`,
       lastModified: new Date(artiste.created_at),
       changeFrequency: "weekly",
       priority: 0.7,
-    }));
+  }));
 
-  const titres = db
-    .prepare("SELECT id, created_at FROM tracks WHERE published = 1 ORDER BY created_at DESC LIMIT 20000")
-    .all()
-    .map((titre) => ({
+  const lignesTitres = await query(
+    "SELECT id, created_at FROM tracks WHERE published ORDER BY created_at DESC LIMIT 20000",
+  );
+  const titres = lignesTitres.map((titre) => ({
       url: `${SITE_URL}/titre/${titre.id}`,
       lastModified: new Date(titre.created_at),
       changeFrequency: "monthly",
       priority: 0.6,
-    }));
+  }));
 
   return [...pages, ...artistes, ...titres];
 }

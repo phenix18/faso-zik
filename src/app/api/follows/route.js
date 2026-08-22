@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await currentUser();
   if (!user) return fail("Connexion requise.", 401);
-  return json({ artistes: artistesSuivis(user.id) });
+  return json({ artistes: await artistesSuivis(user.id) });
 }
 
 export async function POST(request) {
@@ -18,5 +18,5 @@ export async function POST(request) {
   const { artistId } = await request.json();
   if (!artistId) return fail("Identifiant d'artiste manquant.", 422);
 
-  return json({ suit: basculerAbonnement(user.id, artistId) });
+  return json({ suit: await basculerAbonnement(user.id, artistId) });
 }

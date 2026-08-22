@@ -22,14 +22,14 @@ export default async function ComptePage() {
     );
   }
 
-  const compte = findUserById(user.id);
-  const artiste = getArtistByUserId(user.id);
+  const compte = await findUserById(user.id);
+  const artiste = await getArtistByUserId(user.id);
 
   return (
     <CompteClient
       compte={{ name: compte.name, email: compte.email, role: compte.role }}
       artiste={artiste ? { nom: artiste.name, slug: artiste.slug } : null}
-      titres={artiste ? listTracks({ artistId: artiste.id, includeUnpublished: true }).length : 0}
+      titres={artiste ? await listTracks({ artistId: artiste.id, includeUnpublished: true }).length : 0}
     />
   );
 }

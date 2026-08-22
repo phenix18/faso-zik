@@ -13,14 +13,14 @@ const TRIS = [
 
 const PAR_PAGE = 50;
 
-export default function TitresPage({ searchParams }) {
+export default async function TitresPage({ searchParams }) {
   const genre = searchParams?.genre || "";
   const tri = searchParams?.tri || "recent";
   const page = Math.max(1, Number(searchParams?.page) || 1);
 
   // Une page de plus est demandee pour savoir s'il y a une suite, sans avoir a
   // compter tout le catalogue.
-  const lot = listTracks({
+  const lot = await listTracks({
     genre: genre || undefined,
     sort: tri,
     limit: PAR_PAGE + 1,
@@ -28,7 +28,7 @@ export default function TitresPage({ searchParams }) {
   });
   const tracks = lot.slice(0, PAR_PAGE);
   const suite = lot.length > PAR_PAGE;
-  const genres = listGenres();
+  const genres = await listGenres();
 
   const lien = (numero) => {
     const parametres = new URLSearchParams({ tri });

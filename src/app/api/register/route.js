@@ -15,7 +15,7 @@ const schema = z.object({
 });
 
 export async function POST(request) {
-  const limit = rateLimit(clientKey(request, "register"), {
+  const limit = await rateLimit(clientKey(request, "register"), {
     limit: 5,
     windowMs: 60 * 60 * 1000,
   });
@@ -34,7 +34,7 @@ export async function POST(request) {
   }
 
   try {
-    const user = createUser(payload);
+    const user = await createUser(payload);
     return json({ user: publicUser(user) }, 201);
   } catch (error) {
     return fail(error.message, 409);

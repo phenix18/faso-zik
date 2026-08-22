@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { currentUser } from "@/lib/auth";
-import { getDb } from "@/lib/db";
-import { findUserById, publicUser } from "@/lib/repo/users";
+import { query } from "@/lib/db";
+import { changerNom, findUserById, publicUser, supprimerCompte } from "@/lib/repo/users";
 import { changerMotDePasse } from "@/lib/repo/passwords";
 import { getArtistByUserId } from "@/lib/repo/artists";
 import { listTracks } from "@/lib/repo/tracks";
-import { removeMedia, removeMediaTree } from "@/lib/storage";
+import { supprimerObjets } from "@/lib/storage";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -15,13 +15,13 @@ export async function GET() {
   const user = await currentUser();
   if (!user) return fail("Connexion requise.", 401);
 
-  const compte = findUserById(user.id);
-  const artiste = getArtistByUserId(user.id);
+  const compte = await findUserById(user.id);
+  const artiste = await getArtistByUserId(user.id);
 
   return json({
     compte: publicUser(compte),
     artiste: artiste ? { nom: artiste.name, slug: artiste.slug } : null,
-    titres: artiste ? listTracks({ artistId: artiste.id, includeUnpublished: true }).length : 0,
+    titres: artiste ? await listTracks({ artistId: artiste.id, includeUnpublished: true }).length : 0,
   });
 }
 
@@ -45,7 +45,7 @@ export async function PATCH(request) {
   if (corps.nouveauMotDePasse) {
     // L'ancien mot de passe est exige : sans lui, une session volee suffirait
     // a verrouiller definitivement le compte de son proprietaire.
-    const resultat = changerMotDePasse(
+    const resultat = await changerMotDePasse(
       user.id,
       corps.ancienMotDePasse || "",
       corps.nouveauMotDePasse,
@@ -57,7 +57,7 @@ export async function PATCH(request) {
     getDb().prepare("UPDATE users SET name = ? WHERE id = ?").run(corps.name, user.id);
   }
 
-  return json({ compte: publicUser(findUserById(user.id)) });
+  return json({ compte: publicUser(await findUserById(user.id)) });
 }
 
 /**
@@ -76,7 +76,7 @@ export async function DELETE(request) {
     return fail("Confirmation manquante : envoyez le mot SUPPRIMER.", 422);
   }
 
-  const artiste = getArtistByUserId(user.id);
+  const artiste = await getArtistByUserId(user.id);
   const aEffacer = [];
   if (artiste) {
     const db = getDb();

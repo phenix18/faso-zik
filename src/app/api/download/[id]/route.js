@@ -2,49 +2,55 @@ import { currentUser } from "@/lib/auth";
 import { getTrackRow, recordEvent } from "@/lib/repo/tracks";
 import { canDownload, estPayant, peutTelecharger } from "@/lib/permissions";
 import { aAchete } from "@/lib/repo/payments";
-import { extensionFor, mediaStats } from "@/lib/storage";
-import { fail, isFirstRequest, rangeResponse } from "@/lib/http";
+import { adresseDeLecture, extensionFor } from "@/lib/storage";
+import { fail } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Nom de fichier propose : sans caractere de controle, ni guillemet. */
+async function nomDeFichier(row) {
+  const brut = `${row.artist_name} - ${row.title}${extensionFor(row.media_mime)}`;
+  return (
+    brut
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/["\\/]/g, "")
+      .trim()
+      .slice(0, 150) || "faso-zik"
+  );
+}
+
 /**
- * Telechargement : autorise uniquement si l'artiste a coche le droit sur ce
- * morceau. Le refus est renvoye par le serveur, pas seulement masque dans
- * l'interface.
+ * Telechargement : autorise uniquement si l'artiste a ouvert le droit, et si
+ * le titre a ete paye lorsqu'il est en vente. Le refus vient du serveur, pas
+ * d'un bouton masque.
  */
-export async function GET(request, { params }) {
-  const row = getTrackRow(params.id);
+export async function GET(_request, { params }) {
+  const row = await getTrackRow(params.id);
   if (!row) return fail("Morceau introuvable.", 404);
   if (!canDownload(row)) {
     return fail("L'artiste n'autorise pas le telechargement de ce titre.", 403);
   }
 
-  // Le paiement se verifie ici, pas dans l'interface : le lien direct ne doit
-  // pas suffire a contourner l'achat.
   const user = await currentUser();
-  if (estPayant(row) && !peutTelecharger(row, { user, dejaPaye: aAchete(user?.id, row.id) })) {
-    return fail(
-      `Ce titre est vendu ${row.price_cfa} F CFA par l'artiste. Reglez-le pour le telecharger.`,
-      402,
-    );
+  if (estPayant(row)) {
+    const paye = await aAchete(user?.id, row.id);
+    if (!peutTelecharger(row, { user, dejaPaye: paye })) {
+      return fail(
+        `Ce titre est vendu ${row.price_cfa} F CFA par l'artiste. Reglez-le pour le telecharger.`,
+        402,
+      );
+    }
   }
 
-  let media;
+  let adresse;
   try {
-    media = mediaStats(row.media_path);
+    // L'original, jamais la version allegee : c'est ce que l'artiste a depose.
+    adresse = await adresseDeLecture(row.media_path, { telechargement: nomDeFichier(row) });
   } catch {
     return fail("Fichier media absent du stockage.", 410);
   }
 
-  const range = request.headers.get("range");
-  if (isFirstRequest(range)) {
-    recordEvent(row.id, "download", user?.id || null);
-  }
-
-  const filename = `${row.artist_name} - ${row.title}${extensionFor(row.media_mime)}`;
-  return rangeResponse(media.absolute, media.stat, row.media_mime, range, {
-    filename,
-    disposition: "attachment",
-  });
+  await recordEvent(row.id, "download", user?.id || null);
+  return Response.redirect(adresse, 307);
 }

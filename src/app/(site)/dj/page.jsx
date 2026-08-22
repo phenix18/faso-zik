@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { query } from "@/lib/db";
 import { toPublicTrack } from "@/lib/repo/tracks";
 import DjConsole from "@/components/dj/DjConsole";
 
@@ -9,17 +9,18 @@ export const metadata = {
     "Mixez le catalogue FASO-ZIK dans le navigateur : deux platines, crossfader, egaliseur et boucles, sur les titres ouverts au mix par leurs artistes.",
 };
 
-export default function DjPage() {
-  const rows = getDb()
-    .prepare(
-      `SELECT t.*, a.name AS artist_name, a.slug AS artist_slug,
-              a.photo_url AS artist_photo, a.verified AS artist_verified
-         FROM tracks t JOIN artists a ON a.id = t.artist_id
-        WHERE t.published = 1 AND t.allow_stream = 1 AND t.allow_dj = 1 AND t.kind = 'audio'
-        ORDER BY t.plays DESC, t.created_at DESC
-        LIMIT 200`,
-    )
-    .all();
+export default async function DjPage() {
+  const rows = await query(
+    `SELECT t.*, a.name AS artist_name, a.slug AS artist_slug,
+            a.photo_url AS artist_photo, a.verified AS artist_verified,
+            al.title AS album_title, al.slug AS album_slug, al.cover_url AS album_cover
+       FROM tracks t
+       JOIN artists a ON a.id = t.artist_id
+       LEFT JOIN albums al ON al.id = t.album_id
+      WHERE t.published AND t.allow_stream AND t.allow_dj AND t.kind = 'audio'
+      ORDER BY t.plays DESC, t.created_at DESC
+      LIMIT 200`,
+  );
 
   return <DjConsole tracks={rows.map(toPublicTrack)} />;
 }

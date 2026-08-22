@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { execute, query, unique } from "@/lib/db";
 import { newId } from "@/lib/ids";
 
 /** Part prelevee par la plateforme, en pourcentage du montant encaisse. */
@@ -11,7 +11,7 @@ function nouvelleReference() {
   return `FZ-${jour}-${suffixe}`;
 }
 
-export function creerPaiement({
+export async function creerPaiement({
   userId,
   artistId,
   trackId = null,
@@ -21,107 +21,103 @@ export function creerPaiement({
   numero,
   provider,
 }) {
-  const db = getDb();
   const id = newId("pay");
-  const reference = nouvelleReference();
-
-  db.prepare(
+  await execute(
     `INSERT INTO payments (
         id, reference, user_id, artist_id, track_id, type,
         amount_cfa, operator, phone, provider
-     ) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-  ).run(id, reference, userId, artistId, trackId, type, montant, operateur, numero, provider);
-
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [id, nouvelleReference(), userId, artistId, trackId, type, montant, operateur, numero, provider],
+  );
   return paiementParId(id);
 }
 
-export function paiementParId(id) {
-  return getDb().prepare("SELECT * FROM payments WHERE id = ?").get(id);
+export async function paiementParId(id) {
+  return unique("SELECT * FROM payments WHERE id = $1", [id]);
 }
 
-export function paiementParReference(reference) {
-  return getDb().prepare("SELECT * FROM payments WHERE reference = ?").get(reference);
+export async function paiementParReference(reference) {
+  return unique("SELECT * FROM payments WHERE reference = $1", [reference]);
 }
 
-export function paiementParProviderRef(providerRef) {
-  return getDb().prepare("SELECT * FROM payments WHERE provider_ref = ?").get(providerRef);
+export async function paiementParProviderRef(providerRef) {
+  if (!providerRef) return null;
+  return unique("SELECT * FROM payments WHERE provider_ref = $1", [providerRef]);
 }
 
-export function enregistrerProviderRef(id, providerRef) {
-  getDb().prepare("UPDATE payments SET provider_ref = ? WHERE id = ?").run(providerRef, id);
+export async function enregistrerProviderRef(id, providerRef) {
+  await execute("UPDATE payments SET provider_ref = $1 WHERE id = $2", [providerRef, id]);
 }
 
 /**
  * Passage a l'etat final.
  *
- * Un paiement deja paye n'est jamais remis en attente ni repaye : les
- * notifications d'un agregateur arrivent parfois en double, ou dans le
- * desordre.
+ * La condition `status <> 'paye'` est dans la requete elle-meme : deux
+ * notifications simultanees ne peuvent pas conclure deux fois le meme
+ * paiement, meme reparties sur deux instances.
  */
-export function conclurePaiement(id, statut, message = null) {
-  const db = getDb();
-  const paiement = paiementParId(id);
-  if (!paiement || paiement.status === "paye") return paiement;
-
-  db.prepare(
+export async function conclurePaiement(id, statut, message = null) {
+  await execute(
     `UPDATE payments
-        SET status = ?, message = ?, paid_at = CASE WHEN ? = 'paye' THEN datetime('now') ELSE paid_at END
-      WHERE id = ?`,
-  ).run(statut, message, statut, id);
-
+        SET status = $1,
+            message = $2,
+            paid_at = CASE WHEN $1 = 'paye' THEN now() ELSE paid_at END
+      WHERE id = $3 AND status <> 'paye'`,
+    [statut, message, id],
+  );
   return paiementParId(id);
 }
 
 /** L'auditeur a-t-il paye ce titre ? C'est ce qui ouvre son telechargement. */
-export function aAchete(userId, trackId) {
+export async function aAchete(userId, trackId) {
   if (!userId || !trackId) return false;
-  return !!getDb()
-    .prepare(
-      `SELECT 1 FROM payments
-        WHERE user_id = ? AND track_id = ? AND type = 'achat' AND status = 'paye' LIMIT 1`,
-    )
-    .get(userId, trackId);
+  return !!(await unique(
+    `SELECT 1 FROM payments
+      WHERE user_id = $1 AND track_id = $2 AND type = 'achat' AND status = 'paye' LIMIT 1`,
+    [userId, trackId],
+  ));
 }
 
-export function achatsUtilisateur(userId) {
-  return getDb()
-    .prepare(
-      `SELECT p.*, t.title AS track_title, a.name AS artist_name
-         FROM payments p
-         LEFT JOIN tracks t ON t.id = p.track_id
-         JOIN artists a ON a.id = p.artist_id
-        WHERE p.user_id = ? AND p.status = 'paye'
-        ORDER BY p.paid_at DESC`,
-    )
-    .all(userId);
+export async function achatsUtilisateur(userId) {
+  return query(
+    `SELECT p.*, t.title AS track_title, a.name AS artist_name
+       FROM payments p
+       LEFT JOIN tracks t ON t.id = p.track_id
+       JOIN artists a ON a.id = p.artist_id
+      WHERE p.user_id = $1 AND p.status = 'paye'
+      ORDER BY p.paid_at DESC`,
+    [userId],
+  );
 }
 
 /** Ce que l'artiste a encaisse, ce que la plateforme retient, ce qui lui revient. */
-export function revenusArtiste(artistId) {
-  const db = getDb();
-  const totaux = db
-    .prepare(
-      `SELECT COALESCE(SUM(amount_cfa), 0)                                        AS brut,
-              COALESCE(SUM(CASE WHEN type = 'achat' THEN amount_cfa END), 0)      AS achats,
-              COALESCE(SUM(CASE WHEN type = 'pourboire' THEN amount_cfa END), 0)  AS pourboires,
-              COUNT(*)                                                            AS operations
-         FROM payments WHERE artist_id = ? AND status = 'paye'`,
-    )
-    .get(artistId);
+export async function revenusArtiste(artistId) {
+  const totaux = await unique(
+    `SELECT COALESCE(SUM(amount_cfa), 0)::int                                     AS brut,
+            COALESCE(SUM(amount_cfa) FILTER (WHERE type = 'achat'), 0)::int       AS achats,
+            COALESCE(SUM(amount_cfa) FILTER (WHERE type = 'pourboire'), 0)::int   AS pourboires,
+            COUNT(*)::int                                                         AS operations
+       FROM payments WHERE artist_id = $1 AND status = 'paye'`,
+    [artistId],
+  );
 
   const commission = Math.round((totaux.brut * COMMISSION_POURCENT) / 100);
-  return { ...totaux, commission, net: totaux.brut - commission, tauxCommission: COMMISSION_POURCENT };
+  return {
+    ...totaux,
+    commission,
+    net: totaux.brut - commission,
+    tauxCommission: COMMISSION_POURCENT,
+  };
 }
 
-export function paiementsArtiste(artistId, limite = 50) {
-  return getDb()
-    .prepare(
-      `SELECT p.*, t.title AS track_title, u.name AS acheteur
-         FROM payments p
-         LEFT JOIN tracks t ON t.id = p.track_id
-         LEFT JOIN users u ON u.id = p.user_id
-        WHERE p.artist_id = ? AND p.status = 'paye'
-        ORDER BY p.paid_at DESC LIMIT ?`,
-    )
-    .all(artistId, limite);
+export async function paiementsArtiste(artistId, limite = 50) {
+  return query(
+    `SELECT p.*, t.title AS track_title, u.name AS acheteur
+       FROM payments p
+       LEFT JOIN tracks t ON t.id = p.track_id
+       LEFT JOIN users u ON u.id = p.user_id
+      WHERE p.artist_id = $1 AND p.status = 'paye'
+      ORDER BY p.paid_at DESC LIMIT $2`,
+    [artistId, limite],
+  );
 }

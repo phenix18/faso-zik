@@ -4,8 +4,8 @@ import TrackGrid from "@/components/TrackGrid";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Clips video" };
 
-export default function ClipsPage() {
-  const clips = listTracks({ kind: "video", limit: 120 });
+export default async function ClipsPage() {
+  const clips = await listTracks({ kind: "video", limit: 120 });
 
   return (
     <div className="flex flex-col gap-5">

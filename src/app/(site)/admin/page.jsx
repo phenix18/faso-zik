@@ -26,9 +26,9 @@ export default async function AdminPage() {
 
   return (
     <AdminClient
-      resume={vueEnsemble()}
-      artistes={listeArtistes()}
-      titres={derniersTitres(40)}
+      resume={await vueEnsemble()}
+      artistes={await listeArtistes()}
+      titres={await derniersTitres(40)}
     />
   );
 }

@@ -48,8 +48,8 @@ export async function POST(request) {
   }
 
   const paiement =
-    (donnees.transaction_id && paiementParProviderRef(donnees.transaction_id)) ||
-    (donnees.reference && paiementParReference(donnees.reference));
+    (donnees.transaction_id && await paiementParProviderRef(donnees.transaction_id)) ||
+    (donnees.reference && await paiementParReference(donnees.reference));
 
   if (!paiement) return fail("Paiement inconnu.", 404);
 
@@ -57,6 +57,6 @@ export async function POST(request) {
   const statut = correspondance[donnees.status];
   if (!statut) return json({ ignore: true });
 
-  conclurePaiement(paiement.id, statut, donnees.message || null);
+  await conclurePaiement(paiement.id, statut, donnees.message || null);
   return json({ ok: true });
 }
