@@ -7,7 +7,7 @@ ephemere. La base et les fichiers vivent donc a l'exterieur.
 |---|---|
 | **Vercel** | sert les pages et les routes |
 | **PostgreSQL** | comptes, catalogue, paiements — Supabase, Neon, ou un Postgres a soi |
-| **Stockage objet** | les fichiers deposes par les artistes — Supabase Storage |
+| **Stockage objet** | les fichiers deposes par les artistes — Supabase Storage, ou tout stockage compatible S3 |
 
 ---
 
@@ -32,11 +32,51 @@ Creez un seau (bucket) **prive** nomme `faso-zik`. Prive est important : les
 fichiers ne doivent etre joignables que par les adresses signees que
 l'application delivre apres avoir verifie les autorisations.
 
+Deux fournisseurs sont acceptes. Renseigner les variables de l'un ou de
+l'autre suffit a le choisir ; `STOCKAGE_FOURNISSEUR` ne sert qu'a trancher si
+les deux sont presents.
+
+### Supabase Storage
+
 ```
 SUPABASE_URL=https://votre-projet.supabase.co
 SUPABASE_SERVICE_KEY=...   # cle de service, jamais exposee au navigateur
 SUPABASE_BUCKET=faso-zik
 ```
+
+### Compatible S3 — Cloudflare R2, Backblaze B2, MinIO
+
+```
+S3_ENDPOINT=https://<identifiant-de-compte>.r2.cloudflarestorage.com
+S3_BUCKET=faso-zik
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_REGION=auto             # "auto" chez R2 ; la region reelle ailleurs
+```
+
+**Pourquoi cette option existe.** Le trafic sortant est le poste qui coute le
+plus cher a un site de musique : chaque ecoute est un fichier servi. R2 ne le
+facture pas, la ou un quota gratuit classique s'epuise en quelques milliers
+d'ecoutes.
+
+**Le seau doit accepter les envois du navigateur.** Les artistes deposent
+directement au stockage, depuis votre domaine : sans regle CORS, le navigateur
+refuse l'envoi avant meme de le tenter. Chez R2, dans les reglages du seau :
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://votre-domaine.example"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["content-type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+La lecture, elle, ne passe pas par le navigateur en requete croisee :
+l'application redirige vers l'adresse signee, le navigateur la suit comme une
+adresse ordinaire.
 
 ## 3. Le projet Vercel
 
@@ -44,7 +84,8 @@ Reliez le depot, puis renseignez les variables de `.env.example` dans
 **Settings → Environment Variables**. Les indispensables :
 
 - `DATABASE_URL`
-- `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
+- `SUPABASE_URL` et `SUPABASE_SERVICE_KEY`, ou `S3_ENDPOINT`, `S3_BUCKET`,
+  `S3_ACCESS_KEY_ID` et `S3_SECRET_ACCESS_KEY`
 - `NEXTAUTH_SECRET` (`openssl rand -base64 32`), `NEXTAUTH_URL`
 - `NEXT_PUBLIC_SITE_URL`
 
@@ -54,6 +95,8 @@ Puis deployez.
 
 ```sh
 DATABASE_URL=... SUPABASE_URL=... SUPABASE_SERVICE_KEY=... npm run seed
+# ou, avec un stockage compatible S3 :
+DATABASE_URL=... S3_ENDPOINT=... S3_BUCKET=... S3_ACCESS_KEY_ID=... S3_SECRET_ACCESS_KEY=... npm run seed
 ```
 
 Le script fabrique les fichiers audio et les depose : le lecteur et la platine

@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Nom de fichier propose : sans caractere de controle, ni guillemet. */
-async function nomDeFichier(row) {
+function nomDeFichier(row) {
   const brut = `${row.artist_name} - ${row.title}${extensionFor(row.media_mime)}`;
   return (
     brut

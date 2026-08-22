@@ -91,7 +91,7 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 89 tests : autorisations, chemins de medias, limitation de debit, catalogue, albums, paiements, abonnements, mots de passe, identifiants, scripts |
+| `npm test` | 94 tests : autorisations, stockage et adresses signees, chemins de medias, limitation de debit, catalogue, albums, paiements, abonnements, mots de passe, identifiants, scripts |
 | `npm run seed` | jeu de demonstration (idempotent, demande le stockage objet) |
 | `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
 | `npm run check` | verifie que toutes les icones importees existent |
@@ -107,7 +107,9 @@ Voir `.env.example`. Les indispensables :
 - `DATABASE_URL` — connexion PostgreSQL ; vide en developpement, PGlite prend le
   relais
 - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` — stockage des medias ; la cle de
-  service ne quitte jamais le serveur
+  service ne quitte jamais le serveur. Ou, pour un stockage compatible S3
+  (Cloudflare R2, Backblaze B2, MinIO) : `S3_ENDPOINT`, `S3_BUCKET`,
+  `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
 - `MAX_AUDIO_MB`, `MAX_VIDEO_MB`, `MAX_IMAGE_MB` — limites de depot
 
 ---
@@ -132,7 +134,7 @@ src/
     db/             connexion PostgreSQL (deux pilotes) et schema
     repo/           acces aux donnees (users, artists, tracks, albums, ...)
     navigateur/     preparation des medias avant envoi (tempo, encodage MP3)
-    storage.js      adresses signees de depot et de lecture
+    storage.js      adresses signees de depot et de lecture (Supabase ou S3)
     permissions.js  droits accordes par l'artiste
     http.js         reponses JSON et erreurs
     auth.js         options NextAuth et session serveur
@@ -154,6 +156,13 @@ ne survit ni n'est partage. La base vit donc dehors, et les fichiers dans un
 stockage objet. En developpement et pour les tests, un PostgreSQL compile en
 WebAssembly (PGlite) tourne dans le processus : meme dialecte qu'en production,
 aucun service a lancer.
+
+**Le stockage se change sans rouvrir l'application.** Deux adaptateurs
+derriere une meme interface, dans `src/lib/storage.js` : Supabase Storage et
+tout stockage compatible S3. Le trafic sortant est ce qui coute le plus cher a
+un site de musique — chaque ecoute est un fichier servi — et certains
+fournisseurs ne le facturent pas ; l'hebergement des medias devait donc rester
+une decision reversible.
 
 **L'application ne fait jamais passer les octets d'un media.** A la lecture,
 elle verifie l'autorisation puis redirige vers une adresse signee de courte
@@ -297,7 +306,7 @@ Build de production, puis parcours reels contre le serveur demarre :
   `Retry-After` ; 12 tentatives de connexion passent, les suivantes `429` ;
 - depot refuse en `422` sans declaration de droits, accepte avec, y compris en
   appelant l'API directement sans passer par le formulaire ;
-- **89 tests automatises** (`npm test`, sans dependance de test) sur les
+- **94 tests automatises** (`npm test`, sans dependance de test) sur les
   autorisations, la resolution des chemins de medias, la limitation de debit,
   le catalogue, les albums, les paiements, les abonnements, les mots de passe
   et les scripts en ligne de commande. Leur utilite a ete controlee en

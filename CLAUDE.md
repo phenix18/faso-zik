@@ -18,6 +18,12 @@ l'autorisation puis redirige vers une adresse signee du stockage. Au depot,
 c'est l'inverse : le navigateur envoie directement au stockage, avec une
 adresse signee que l'application lui a delivree.
 
+**Deux stockages derriere une meme interface**, dans `src/lib/storage.js` :
+Supabase Storage et tout stockage compatible S3 (R2, B2, MinIO). Le choix se
+fait aux variables d'environnement. Les adaptateurs n'exposent que quatre
+operations — depot signe, lecture signee, depot serveur, suppression — et rien
+d'autre dans le code ne connait le fournisseur.
+
 **Tout l'acces aux donnees passe par `src/lib/repo/*`.** Aucune requete SQL
 ailleurs, et tout y est asynchrone.
 
@@ -25,7 +31,7 @@ ailleurs, et tout y est asynchrone.
 
 ```sh
 npm run dev      # developpement
-npm test         # 89 tests, sans dependance de test
+npm test         # 94 tests, sans dependance de test
 npm run check    # verifie que les icones importees existent
 npm run lint
 npm run seed     # catalogue de demonstration, fichiers audio compris

@@ -60,7 +60,7 @@ export async function POST(request, { params }) {
   return json({ paiement: publier(await conclurePaiement(paiement.id, statut, "Confirmation simulee")) });
 }
 
-async function publier(paiement) {
+function publier(paiement) {
   return {
     reference: paiement.reference,
     type: paiement.type,

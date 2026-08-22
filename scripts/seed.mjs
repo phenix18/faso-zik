@@ -121,7 +121,10 @@ function synthetiser({ bpm, secondes = 24, fondamentale = 110 }) {
 /* ------------------------------ insertion ------------------------------ */
 
 if (!stockageConfigure()) {
-  console.error("Stockage non configure : renseignez SUPABASE_URL et SUPABASE_SERVICE_KEY.");
+  console.error(
+    "Stockage non configure : renseignez SUPABASE_URL et SUPABASE_SERVICE_KEY,",
+    "\nou S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID et S3_SECRET_ACCESS_KEY.",
+  );
   console.error("Le catalogue de demonstration a besoin d'un endroit ou deposer ses fichiers.");
   process.exit(1);
 }
