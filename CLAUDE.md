@@ -42,7 +42,7 @@ ailleurs, et tout y est asynchrone.
 
 ```sh
 npm run dev      # developpement
-npm test         # 107 tests, sans dependance de test
+npm test         # 110 tests, sans dependance de test
 npm run check    # verifie que les icones importees existent
 npm run verifier # controle d'installation : appelle vraiment la base et le stockage
 npm run lint

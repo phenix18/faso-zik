@@ -80,6 +80,42 @@ async function ouvrir() {
 }
 
 /**
+ * Deux instances ont voulu creer le schema en meme temps.
+ *
+ * `CREATE TABLE IF NOT EXISTS` n'est pas atomique face a un createur
+ * concurrent : les deux constatent l'absence, puis se disputent la meme ligne
+ * du catalogue. Le perdant recoit une violation d'unicite — qui signifie que
+ * l'objet existe, donc exactement ce qu'on voulait.
+ */
+function estCollisionDeCreation(erreur) {
+  // 23505 unicite (pg_type), 42P07 relation deja presente, 42710 objet duplique.
+  return ["23505", "42P07", "42710"].includes(erreur?.code);
+}
+
+/**
+ * Applique le schema, en serialisant les instances concurrentes.
+ *
+ * Sur une plateforme sans serveur, la premiere vague de trafic reveille
+ * plusieurs instances a la seconde pres, et chacune applique le schema de son
+ * cote. Un verrou consultatif les met a la file ; la tolerance a la collision
+ * reste par-dessus, pour le cas ou le verrou ne serait pas obtenu.
+ */
+async function appliquerSchema(base) {
+  // Entier arbitraire mais stable : c'est le nom du verrou.
+  const CLE = 4185220001;
+  const verrouillable = base.type === "postgres";
+
+  if (verrouillable) await base.query("SELECT pg_advisory_lock($1)", [CLE]);
+  try {
+    await base.exec(schema);
+  } catch (erreur) {
+    if (!estCollisionDeCreation(erreur)) throw erreur;
+  } finally {
+    if (verrouillable) await base.query("SELECT pg_advisory_unlock($1)", [CLE]);
+  }
+}
+
+/**
  * Ouvre la connexion et applique le schema, une seule fois par processus.
  *
  * L'ouverture en cours est mise de cote pour que deux requetes simultanees
@@ -92,7 +128,7 @@ export async function getDb() {
   if (!preparation) {
     preparation = (async () => {
       const base = await ouvrir();
-      await base.exec(schema);
+      await appliquerSchema(base);
       connexion = base;
       return base;
     })().catch((erreur) => {
@@ -102,6 +138,9 @@ export async function getDb() {
   }
   return preparation;
 }
+
+/** Expose pour les tests : la reconnaissance d'une collision de creation. */
+export const _estCollisionDeCreation = estCollisionDeCreation;
 
 /** Lignes d'une requete. Les parametres sont toujours lies, jamais concatenes. */
 export async function query(texte, params = []) {
