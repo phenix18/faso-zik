@@ -84,3 +84,26 @@ test("sans liste, aucun compte n'est promu", async () => {
   });
   assert.equal(await roleALaConnexion(compte), "auditeur");
 });
+
+test("une adresse ajoutee en cours de session est promue au rafraichissement", async () => {
+  const compte = await createUser({
+    name: "Tardif",
+    email: "tardif@faso-zik.bf",
+    password: "motdepasse12",
+  });
+
+  // Connexion d'abord, variable ensuite : c'est l'ordre qui piegeait.
+  delete process.env.ADMIN_EMAILS;
+  assert.equal((await rafraichirJeton(compte.id)).role, "auditeur");
+
+  process.env.ADMIN_EMAILS = "tardif@faso-zik.bf";
+  assert.equal(
+    (await rafraichirJeton(compte.id)).role,
+    "admin",
+    "le role doit s'appliquer sans deconnexion",
+  );
+
+  // Et il reste inscrit en base, meme si la variable disparait ensuite.
+  delete process.env.ADMIN_EMAILS;
+  assert.equal((await rafraichirJeton(compte.id)).role, "admin");
+});

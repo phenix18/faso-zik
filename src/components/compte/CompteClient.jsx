@@ -74,7 +74,10 @@ export default function CompteClient({ compte, artiste, titres }) {
         <p className="text-xs font-semibold uppercase tracking-widest text-faso-gold">Mon compte</p>
         <h1 className="text-2xl font-black text-white">{compte.name}</h1>
         <p className="text-sm text-white/45">
-          {compte.email} · {compte.role}
+          {compte.email} ·{" "}
+          <span className={compte.role === "admin" ? "font-semibold text-faso-gold" : ""}>
+            {compte.role}
+          </span>
           {artiste && (
             <>
               {" · "}
