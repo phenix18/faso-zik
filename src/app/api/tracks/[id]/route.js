@@ -2,7 +2,7 @@ import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { deleteTrack, getTrack, getTrackRow, updateTrack } from "@/lib/repo/tracks";
 import { ownsTrack } from "@/lib/permissions";
-import { removeMedia } from "@/lib/storage";
+import { cheminDepuisAdresse, nettoyerObjets } from "@/lib/storage";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -16,6 +16,9 @@ const patchSchema = z.object({
   bpm: z.number().min(30).max(300).nullable().optional(),
   musicKey: z.string().max(10).optional(),
   license: z.string().max(160).optional(),
+  // Prix du telechargement en francs CFA ; plafonne pour eviter une faute de
+  // frappe qui rendrait un titre inachetable.
+  priceCfa: z.number().int().min(0).max(500000).optional(),
   allowStream: z.boolean().optional(),
   allowDownload: z.boolean().optional(),
   allowDj: z.boolean().optional(),
@@ -23,14 +26,14 @@ const patchSchema = z.object({
 });
 
 export async function GET(_request, { params }) {
-  const track = getTrack(params.id);
+  const track = await getTrack(params.id);
   if (!track || !track.published) return fail("Morceau introuvable.", 404);
   return json({ track });
 }
 
 export async function PATCH(request, { params }) {
   const user = await currentUser();
-  const row = getTrackRow(params.id);
+  const row = await getTrackRow(params.id);
   if (!row) return fail("Morceau introuvable.", 404);
   if (!ownsTrack(user, row)) return fail("Seul l'artiste proprietaire peut modifier ce morceau.", 403);
 
@@ -41,16 +44,18 @@ export async function PATCH(request, { params }) {
     return fail(error.errors?.[0]?.message || "Donnees invalides.", 422);
   }
 
-  return json({ track: updateTrack(params.id, fields) });
+  return json({ track: await updateTrack(params.id, fields) });
 }
 
 export async function DELETE(_request, { params }) {
   const user = await currentUser();
-  const row = getTrackRow(params.id);
+  const row = await getTrackRow(params.id);
   if (!row) return fail("Morceau introuvable.", 404);
   if (!ownsTrack(user, row)) return fail("Seul l'artiste proprietaire peut supprimer ce morceau.", 403);
 
-  deleteTrack(params.id);
-  await removeMedia(row.media_path);
+  await deleteTrack(params.id);
+  // Les fichiers derives ne sont references que par ce morceau : ils partent
+  // avec lui, sinon le stockage se remplit d'objets orphelins.
+  await nettoyerObjets([row.media_path, row.preview_path, cheminDepuisAdresse(row.cover_url)]);
   return json({ ok: true });
 }

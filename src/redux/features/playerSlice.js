@@ -15,6 +15,9 @@ const initialState = {
   repeat: "off", // off | one | all
   shuffle: false,
   fullScreen: false,
+  // Economie de donnees : definition la plus basse et prechargement reduit.
+  // Relu depuis le navigateur au montage du lecteur.
+  dataSaver: false,
   progress: { position: 0, duration: 0 },
 };
 
@@ -45,6 +48,29 @@ const playerSlice = createSlice({
     enqueue: (state, action) => {
       state.queue.push(action.payload);
       state.isActive = true;
+    },
+    /** Saut direct a une position de la file, depuis le panneau d'attente. */
+    jumpTo: (state, action) => {
+      const index = action.payload;
+      if (index < 0 || index >= state.queue.length) return;
+      state.index = index;
+      state.current = state.queue[index];
+      state.isPlaying = true;
+    },
+    removeFromQueue: (state, action) => {
+      const index = action.payload;
+      if (index < 0 || index >= state.queue.length) return;
+
+      state.queue.splice(index, 1);
+      if (!state.queue.length) return;
+
+      // Retirer un titre avant celui en cours decalerait la lecture : on
+      // suit le morceau plutot que sa position.
+      if (index < state.index) state.index -= 1;
+      else if (index === state.index) {
+        state.index = Math.min(state.index, state.queue.length - 1);
+        state.current = state.queue[state.index];
+      }
     },
     playPause: (state, action) => {
       state.isPlaying = action.payload ?? !state.isPlaying;
@@ -86,10 +112,13 @@ const playerSlice = createSlice({
     setFullScreen: (state, action) => {
       state.fullScreen = action.payload;
     },
+    setDataSaver: (state, action) => {
+      state.dataSaver = action.payload;
+    },
     setProgress: (state, action) => {
       state.progress = action.payload;
     },
-    closePlayer: () => initialState,
+    closePlayer: (state) => ({ ...initialState, dataSaver: state.dataSaver }),
   },
 });
 
@@ -97,6 +126,8 @@ export const {
   playTrack,
   setQueue,
   enqueue,
+  jumpTo,
+  removeFromQueue,
   playPause,
   next,
   previous,
@@ -105,6 +136,7 @@ export const {
   cycleRepeat,
   toggleShuffle,
   setFullScreen,
+  setDataSaver,
   setProgress,
   closePlayer,
 } = playerSlice.actions;

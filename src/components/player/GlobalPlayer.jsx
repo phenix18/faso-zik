@@ -12,11 +12,16 @@ import {
   HiForward,
   HiPause,
   HiPlay,
+  HiQueueList,
+  HiSignal,
+  HiSignalSlash,
   HiSpeakerWave,
   HiSpeakerXMark,
   HiXMark,
 } from "react-icons/hi2";
 import Cover from "@/components/Cover";
+import FileAttente from "@/components/FileAttente";
+import useMediaSource from "@/components/player/useMediaSource";
 import DownloadButton from "@/components/DownloadButton";
 import FavouriteButton from "@/components/FavouriteButton";
 import {
@@ -25,6 +30,7 @@ import {
   next,
   playPause,
   previous,
+  setDataSaver,
   setFullScreen,
   setProgress,
   setVolume,
@@ -44,20 +50,36 @@ export default function GlobalPlayer() {
   const dispatch = useDispatch();
   const mediaRef = useRef(null);
   const [buffered, setBuffered] = useState(0);
-  const { current, isPlaying, volume, muted, repeat, shuffle, fullScreen, progress, queue, index } =
-    useSelector((state) => state.player);
+  const [fileOuverte, setFileOuverte] = useState(false);
+  const {
+    current,
+    isPlaying,
+    volume,
+    muted,
+    repeat,
+    shuffle,
+    fullScreen,
+    dataSaver,
+    progress,
+    queue,
+    index,
+  } = useSelector((state) => state.player);
 
   const isVideo = current?.kind === "video";
 
-  // Changement de morceau : nouvelle source puis lecture.
+  // Attache la source et relance la lecture au changement de morceau.
+  useMediaSource(mediaRef, current, { shouldPlay: isPlaying });
+
+  // La preference d'economie de donnees appartient a l'appareil, pas au compte :
+  // le meme auditeur la veut sur son telephone et pas sur son ordinateur.
   useEffect(() => {
-    const media = mediaRef.current;
-    if (!media || !current) return;
-    media.src = current.streamUrl;
-    media.load();
-    if (isPlaying) media.play().catch(() => dispatch(playPause(false)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id]);
+    try {
+      const enregistre = window.localStorage.getItem("faso-zik:economie");
+      if (enregistre === "1") dispatch(setDataSaver(true));
+    } catch {
+      /* stockage indisponible : on garde la valeur par defaut */
+    }
+  }, [dispatch]);
 
   useEffect(() => {
     const media = mediaRef.current;
@@ -259,6 +281,30 @@ export default function GlobalPlayer() {
             </span>
             <button
               type="button"
+              onClick={() => {
+                const suivant = !dataSaver;
+                dispatch(setDataSaver(suivant));
+                try {
+                  window.localStorage.setItem("faso-zik:economie", suivant ? "1" : "0");
+                } catch {
+                  /* preference non conservee : sans consequence sur la lecture */
+                }
+              }}
+              aria-pressed={dataSaver}
+              aria-label={
+                dataSaver ? "Desactiver l'economie de donnees" : "Activer l'economie de donnees"
+              }
+              title={
+                dataSaver
+                  ? "Economie de donnees active : definition minimale"
+                  : "Economie de donnees"
+              }
+              className={`text-lg ${dataSaver ? "text-faso-green" : "text-white/40 hover:text-white"}`}
+            >
+              {dataSaver ? <HiSignalSlash /> : <HiSignal />}
+            </button>
+            <button
+              type="button"
               onClick={() => dispatch(toggleMute())}
               aria-label={muted ? "Retablir le son" : "Couper le son"}
               className="text-lg text-white/60 hover:text-white"
@@ -275,9 +321,22 @@ export default function GlobalPlayer() {
               aria-label="Volume"
               className="w-24"
             />
-            <span className="text-xs text-white/35">
-              {queue.length > 1 ? `${index + 1}/${queue.length}` : ""}
-            </span>
+            <button
+              type="button"
+              onClick={() => setFileOuverte((etat) => !etat)}
+              aria-label="File d'attente"
+              aria-expanded={fileOuverte}
+              className={`flex items-center gap-1 text-lg ${
+                fileOuverte ? "text-faso-gold" : "text-white/45 hover:text-white"
+              }`}
+            >
+              <HiQueueList />
+              {queue.length > 1 && (
+                <span className="text-[11px] tabular-nums">
+                  {index + 1}/{queue.length}
+                </span>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => dispatch(closePlayer())}
@@ -289,6 +348,8 @@ export default function GlobalPlayer() {
           </div>
         </div>
       </div>
+
+      <FileAttente ouvert={fileOuverte} onFermer={() => setFileOuverte(false)} />
     </>
   );
 }

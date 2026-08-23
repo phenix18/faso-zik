@@ -1,19 +1,29 @@
-import { getDb } from "@/lib/db";
+import { execute, query, unique } from "@/lib/db";
 import { newId, slugify } from "@/lib/ids";
 
 const SELECT_TRACK = `
   SELECT t.*,
-         a.name  AS artist_name,
-         a.slug  AS artist_slug,
-         a.photo_url AS artist_photo,
-         a.verified  AS artist_verified
+         a.name       AS artist_name,
+         a.slug       AS artist_slug,
+         a.photo_url  AS artist_photo,
+         a.verified   AS artist_verified,
+         al.title     AS album_title,
+         al.slug      AS album_slug,
+         al.cover_url AS album_cover
     FROM tracks t
     JOIN artists a ON a.id = t.artist_id
+    LEFT JOIN albums al ON al.id = t.album_id
 `;
 
-/** Forme envoyee au navigateur : jamais le chemin disque du fichier source. */
+/** Forme envoyee au navigateur : jamais le chemin de stockage du fichier. */
 export function toPublicTrack(row) {
   if (!row) return null;
+
+  // Les entiers larges reviennent parfois en chaine selon le pilote : on les
+  // ramene a des nombres avant de les envoyer au navigateur.
+  const taille = Number(row.media_size) || 0;
+  const tailleEcoute = row.preview_size == null ? taille : Number(row.preview_size);
+
   return {
     id: row.id,
     title: row.title,
@@ -22,13 +32,22 @@ export function toPublicTrack(row) {
     genre: row.genre,
     language: row.language,
     description: row.description,
-    duration: row.duration,
-    bpm: row.bpm,
+    duration: Number(row.duration) || 0,
+    bpm: row.bpm == null ? null : Number(row.bpm),
     musicKey: row.music_key,
-    coverUrl: row.cover_url,
+    // A defaut de pochette propre, celle de l'album : un titre isole dans une
+    // liste d'album ne doit pas jurer avec ses voisins.
+    coverUrl: row.cover_url || row.album_cover || null,
+    album: row.album_id
+      ? { id: row.album_id, title: row.album_title, slug: row.album_slug, trackNo: row.track_no }
+      : null,
     mime: row.media_mime,
-    size: row.media_size,
+    size: taille,
+    streamSize: tailleEcoute,
+    hasPreview: !!row.preview_path,
     license: row.license,
+    priceCfa: row.price_cfa || 0,
+    rightsConfirmed: !!row.rights_confirmed,
     published: !!row.published,
     plays: row.plays,
     downloads: row.downloads,
@@ -37,6 +56,7 @@ export function toPublicTrack(row) {
       stream: !!row.allow_stream,
       download: !!row.allow_download,
       dj: !!row.allow_dj,
+      downloadPaid: !!row.allow_download && (row.price_cfa || 0) > 0,
     },
     artist: {
       id: row.artist_id,
@@ -46,22 +66,26 @@ export function toPublicTrack(row) {
       verified: !!row.artist_verified,
     },
     streamUrl: `/api/stream/${row.id}`,
-    downloadUrl: row.allow_download ? `/api/download/${row.id}` : null,
+    // Le lien direct n'apparait que pour un telechargement gratuit ; un titre
+    // payant passe d'abord par la page de paiement.
+    downloadUrl: row.allow_download && !(row.price_cfa || 0) ? `/api/download/${row.id}` : null,
   };
 }
 
-export function getTrackRow(id) {
-  return getDb().prepare(`${SELECT_TRACK} WHERE t.id = ?`).get(id);
+export async function getTrackRow(id) {
+  if (!id) return null;
+  return unique(`${SELECT_TRACK} WHERE t.id = $1`, [id]);
 }
 
-export function getTrack(id) {
-  return toPublicTrack(getTrackRow(id));
+export async function getTrack(id) {
+  return toPublicTrack(await getTrackRow(id));
 }
 
-export function listTracks({
+export async function listTracks({
   kind,
   artistId,
   artistSlug,
+  albumId,
   genre,
   search = "",
   sort = "recent",
@@ -71,99 +95,100 @@ export function listTracks({
 } = {}) {
   const where = [];
   const params = [];
+  const lier = (valeur) => {
+    params.push(valeur);
+    return `$${params.length}`;
+  };
 
-  if (!includeUnpublished) where.push("t.published = 1");
-  if (kind) {
-    where.push("t.kind = ?");
-    params.push(kind);
-  }
-  if (artistId) {
-    where.push("t.artist_id = ?");
-    params.push(artistId);
-  }
-  if (artistSlug) {
-    where.push("a.slug = ?");
-    params.push(artistSlug);
-  }
-  if (genre) {
-    where.push("LOWER(t.genre) = LOWER(?)");
-    params.push(genre);
-  }
+  if (!includeUnpublished) where.push("t.published");
+  if (kind) where.push(`t.kind = ${lier(kind)}`);
+  if (artistId) where.push(`t.artist_id = ${lier(artistId)}`);
+  if (artistSlug) where.push(`a.slug = ${lier(artistSlug)}`);
+  if (albumId) where.push(`t.album_id = ${lier(albumId)}`);
+  if (genre) where.push(`LOWER(t.genre) = LOWER(${lier(genre)})`);
+
   if (search.trim()) {
-    where.push("(t.title LIKE ? OR a.name LIKE ? OR t.genre LIKE ? OR t.language LIKE ?)");
-    const like = `%${search.trim()}%`;
-    params.push(like, like, like, like);
+    const like = lier(`%${search.trim()}%`);
+    where.push(`(t.title ILIKE ${like} OR a.name ILIKE ${like} OR t.genre ILIKE ${like} OR t.language ILIKE ${like})`);
   }
 
+  // Le tri vient d'une liste fermee : jamais du texte recu.
   const order =
     { populaire: "t.plays DESC, t.created_at DESC", titre: "t.title ASC" }[sort] ||
     "t.created_at DESC";
 
-  const sql = `${SELECT_TRACK}
-    ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-    ORDER BY ${order}
-    LIMIT ? OFFSET ?`;
+  const lignes = await query(
+    `${SELECT_TRACK}
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY ${order}
+      LIMIT ${lier(limit)} OFFSET ${lier(offset)}`,
+    params,
+  );
 
-  return getDb()
-    .prepare(sql)
-    .all(...params, limit, offset)
-    .map(toPublicTrack);
+  return lignes.map(toPublicTrack);
 }
 
-export function listGenres() {
-  return getDb()
-    .prepare(
-      `SELECT genre, COUNT(*) AS n
-         FROM tracks WHERE published = 1 AND genre IS NOT NULL AND genre <> ''
-        GROUP BY genre ORDER BY n DESC LIMIT 24`,
-    )
-    .all();
+export async function listGenres() {
+  return query(
+    `SELECT genre, COUNT(*)::int AS n
+       FROM tracks
+      WHERE published AND genre IS NOT NULL AND genre <> ''
+      GROUP BY genre ORDER BY n DESC LIMIT 24`,
+  );
 }
 
-export function uniqueTrackSlug(artistId, title) {
-  const db = getDb();
+export async function uniqueTrackSlug(artistId, title) {
   const base = slugify(title);
   let slug = base;
   let n = 2;
-  while (
-    db.prepare("SELECT 1 FROM tracks WHERE artist_id = ? AND slug = ?").get(artistId, slug)
-  ) {
+  while (await unique("SELECT 1 FROM tracks WHERE artist_id = $1 AND slug = $2", [artistId, slug])) {
     slug = `${base}-${n++}`;
   }
   return slug;
 }
 
-export function createTrack(data) {
-  const db = getDb();
+export async function createTrack(data) {
   const id = newId("trk");
-  db.prepare(
+  const slug = await uniqueTrackSlug(data.artistId, data.title);
+
+  await execute(
     `INSERT INTO tracks (
-        id, artist_id, title, slug, kind, genre, language, description,
+        id, artist_id, album_id, track_no, title, slug, kind, genre, language, description,
         duration, bpm, music_key, cover_url, media_path, media_mime, media_size,
-        allow_stream, allow_download, allow_dj, license, published
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-  ).run(
-    id,
-    data.artistId,
-    data.title,
-    uniqueTrackSlug(data.artistId, data.title),
-    data.kind,
-    data.genre || null,
-    data.language || null,
-    data.description || null,
-    data.duration || 0,
-    data.bpm || null,
-    data.musicKey || null,
-    data.coverUrl || null,
-    data.mediaPath,
-    data.mediaMime,
-    data.mediaSize,
-    data.allowStream === false ? 0 : 1,
-    data.allowDownload ? 1 : 0,
-    data.allowDj ? 1 : 0,
-    data.license || "Tous droits reserves",
-    data.published === false ? 0 : 1,
+        preview_path, preview_mime, preview_size,
+        allow_stream, allow_download, allow_dj, license, rights_confirmed, published, price_cfa
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
+    [
+      id,
+      data.artistId,
+      data.albumId || null,
+      data.trackNo || null,
+      data.title,
+      slug,
+      data.kind,
+      data.genre || null,
+      data.language || null,
+      data.description || null,
+      data.duration || 0,
+      data.bpm || null,
+      data.musicKey || null,
+      data.coverUrl || null,
+      data.mediaPath,
+      data.mediaMime,
+      data.mediaSize,
+      data.previewPath || null,
+      data.previewMime || null,
+      data.previewSize || null,
+      data.allowStream !== false,
+      !!data.allowDownload,
+      !!data.allowDj,
+      data.license || "Tous droits reserves",
+      !!data.rightsConfirmed,
+      data.published !== false,
+      Math.max(0, Math.round(Number(data.priceCfa) || 0)),
+    ],
   );
+
   return getTrack(id);
 }
 
@@ -171,7 +196,7 @@ export function createTrack(data) {
  * Mise a jour reservee au proprietaire du morceau (verifie par l'appelant).
  * Ce sont notamment les autorisations que l'artiste accorde ou retire.
  */
-export function updateTrack(id, fields) {
+export async function updateTrack(id, fields) {
   const map = {
     title: "title",
     genre: "genre",
@@ -181,38 +206,48 @@ export function updateTrack(id, fields) {
     musicKey: "music_key",
     coverUrl: "cover_url",
     license: "license",
+    priceCfa: "price_cfa",
+    albumId: "album_id",
+    trackNo: "track_no",
     allowStream: "allow_stream",
     allowDownload: "allow_download",
     allowDj: "allow_dj",
     published: "published",
   };
-  const booleans = new Set(["allowStream", "allowDownload", "allowDj", "published"]);
+  const booleens = new Set(["allowStream", "allowDownload", "allowDj", "published"]);
 
-  const entries = Object.entries(fields).filter(
-    ([key, value]) => map[key] && value !== undefined,
-  );
+  const entries = Object.entries(fields).filter(([key, value]) => map[key] && value !== undefined);
   if (!entries.length) return getTrack(id);
 
-  const setSql = entries.map(([key]) => `${map[key]} = ?`).join(", ");
-  const values = entries.map(([key, value]) => (booleans.has(key) ? (value ? 1 : 0) : value));
-  getDb().prepare(`UPDATE tracks SET ${setSql} WHERE id = ?`).run(...values, id);
+  const setSql = entries.map(([key], index) => `${map[key]} = $${index + 1}`).join(", ");
+  const valeurs = entries.map(([key, value]) => (booleens.has(key) ? !!value : value));
+
+  await execute(`UPDATE tracks SET ${setSql} WHERE id = $${entries.length + 1}`, [...valeurs, id]);
   return getTrack(id);
 }
 
-export function deleteTrack(id) {
-  getDb().prepare("DELETE FROM tracks WHERE id = ?").run(id);
+export async function deleteTrack(id) {
+  await execute("DELETE FROM tracks WHERE id = $1", [id]);
 }
 
-export function recordEvent(trackId, type, userId = null) {
-  const db = getDb();
-  db.prepare("INSERT INTO events (track_id, user_id, type) VALUES (?, ?, ?)").run(
+/** Chemin du fichier a servir a l'ecoute : la version allegee si elle existe. */
+export function playbackSource(row) {
+  if (row.preview_path) {
+    return { path: row.preview_path, mime: row.preview_mime || "audio/mpeg" };
+  }
+  return { path: row.media_path, mime: row.media_mime };
+}
+
+export async function recordEvent(trackId, type, userId = null) {
+  await execute("INSERT INTO events (track_id, user_id, type) VALUES ($1, $2, $3)", [
     trackId,
     userId,
     type,
-  );
+  ]);
+
   if (type === "play") {
-    db.prepare("UPDATE tracks SET plays = plays + 1 WHERE id = ?").run(trackId);
+    await execute("UPDATE tracks SET plays = plays + 1 WHERE id = $1", [trackId]);
   } else if (type === "download") {
-    db.prepare("UPDATE tracks SET downloads = downloads + 1 WHERE id = ?").run(trackId);
+    await execute("UPDATE tracks SET downloads = downloads + 1 WHERE id = $1", [trackId]);
   }
 }

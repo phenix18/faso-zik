@@ -1,61 +1,61 @@
 import bcrypt from "bcryptjs";
-import { getDb } from "@/lib/db";
+import { execute, transaction, unique } from "@/lib/db";
 import { newId, slugify } from "@/lib/ids";
 
 export const ROLES = ["auditeur", "artiste", "admin"];
 
-export function findUserByEmail(email) {
-  return getDb()
-    .prepare("SELECT * FROM users WHERE email = ?")
-    .get(String(email || "").toLowerCase().trim());
+export async function findUserByEmail(email) {
+  return unique("SELECT * FROM users WHERE email = $1", [
+    String(email || "").toLowerCase().trim(),
+  ]);
 }
 
-export function findUserById(id) {
-  return getDb().prepare("SELECT * FROM users WHERE id = ?").get(id);
+export async function findUserById(id) {
+  return unique("SELECT * FROM users WHERE id = $1", [id]);
+}
+
+export async function uniqueArtistSlug(name) {
+  const base = slugify(name);
+  let slug = base;
+  let n = 2;
+  while (await unique("SELECT 1 FROM artists WHERE slug = $1", [slug])) {
+    slug = `${base}-${n++}`;
+  }
+  return slug;
 }
 
 /**
  * Cree un compte. Si role = "artiste", la fiche artiste est creee dans la
  * meme transaction : un artiste sans fiche ne pourrait rien publier.
  */
-export function createUser({ name, email, password, role = "auditeur", city, bio }) {
-  const db = getDb();
+export async function createUser({ name, email, password, role = "auditeur", city, bio }) {
   const normalizedEmail = String(email).toLowerCase().trim();
-  if (findUserByEmail(normalizedEmail)) {
+  if (await findUserByEmail(normalizedEmail)) {
     throw new Error("Un compte existe deja avec cette adresse e-mail.");
   }
 
   const userId = newId("usr");
   const passwordHash = bcrypt.hashSync(password, 10);
   const wantsArtist = role === "artiste";
+  const slug = wantsArtist ? await uniqueArtistSlug(name) : null;
 
-  const run = db.transaction(() => {
-    db.prepare(
+  await transaction(async (q) => {
+    await q(
       `INSERT INTO users (id, name, email, password_hash, role)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(userId, name, normalizedEmail, passwordHash, wantsArtist ? "artiste" : "auditeur");
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, name, normalizedEmail, passwordHash, wantsArtist ? "artiste" : "auditeur"],
+    );
 
     if (wantsArtist) {
-      db.prepare(
+      await q(
         `INSERT INTO artists (id, user_id, name, slug, bio, city)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      ).run(newId("art"), userId, name, uniqueArtistSlug(name), bio || null, city || null);
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [newId("art"), userId, name, slug, bio || null, city || null],
+      );
     }
   });
-  run();
 
   return findUserById(userId);
-}
-
-export function uniqueArtistSlug(name) {
-  const db = getDb();
-  const base = slugify(name);
-  let slug = base;
-  let n = 2;
-  while (db.prepare("SELECT 1 FROM artists WHERE slug = ?").get(slug)) {
-    slug = `${base}-${n++}`;
-  }
-  return slug;
 }
 
 export function verifyPassword(user, password) {
@@ -64,25 +64,36 @@ export function verifyPassword(user, password) {
 }
 
 /** Promeut un auditeur en artiste (creation de la fiche associee). */
-export function promoteToArtist(userId, { stageName, city, bio } = {}) {
-  const db = getDb();
-  const user = findUserById(userId);
+export async function promoteToArtist(userId, { stageName, city, bio } = {}) {
+  const user = await findUserById(userId);
   if (!user) throw new Error("Compte introuvable.");
 
-  const existing = db.prepare("SELECT * FROM artists WHERE user_id = ?").get(userId);
+  const existing = await unique("SELECT * FROM artists WHERE user_id = $1", [userId]);
   if (existing) return existing;
 
   const name = stageName?.trim() || user.name;
   const artistId = newId("art");
-  db.transaction(() => {
-    db.prepare(
-      `INSERT INTO artists (id, user_id, name, slug, bio, city)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(artistId, userId, name, uniqueArtistSlug(name), bio || null, city || null);
-    db.prepare("UPDATE users SET role = 'artiste' WHERE id = ?").run(userId);
-  })();
+  const slug = await uniqueArtistSlug(name);
 
-  return db.prepare("SELECT * FROM artists WHERE id = ?").get(artistId);
+  await transaction(async (q) => {
+    await q(
+      `INSERT INTO artists (id, user_id, name, slug, bio, city)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [artistId, userId, name, slug, bio || null, city || null],
+    );
+    await q("UPDATE users SET role = 'artiste' WHERE id = $1", [userId]);
+  });
+
+  return unique("SELECT * FROM artists WHERE id = $1", [artistId]);
+}
+
+export async function changerNom(userId, nom) {
+  await execute("UPDATE users SET name = $1 WHERE id = $2", [nom, userId]);
+  return findUserById(userId);
+}
+
+export async function supprimerCompte(userId) {
+  await execute("DELETE FROM users WHERE id = $1", [userId]);
 }
 
 export function publicUser(user) {

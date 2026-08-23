@@ -11,10 +11,14 @@ const LINKS = [
   ["/titres", "Titres"],
   ["/clips", "Clips video"],
   ["/artistes", "Artistes"],
+  ["/classement", "Classement"],
   ["/dj", "Platine DJ"],
+  ["/nouveautes", "Nouveautes"],
   ["/favoris", "Mes favoris"],
   ["/playlists", "Mes playlists"],
   ["/studio", "Mon studio"],
+  ["/compte", "Mon compte"],
+  ["/droits", "Droits et retrait"],
 ];
 
 export default function MobileNav({ open, onClose }) {

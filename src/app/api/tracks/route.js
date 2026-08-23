@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const p = new URL(request.url).searchParams;
-  const tracks = listTracks({
+  const tracks = await listTracks({
     kind: p.get("kind") || undefined,
     artistSlug: p.get("artiste") || undefined,
     genre: p.get("genre") || undefined,
@@ -15,5 +15,5 @@ export async function GET(request) {
     limit: Math.min(Number(p.get("limit") || 60), 200),
     offset: Number(p.get("offset") || 0),
   });
-  return json({ tracks, genres: p.get("genres") ? listGenres() : undefined });
+  return json({ tracks, genres: p.get("genres") ? await listGenres() : undefined });
 }

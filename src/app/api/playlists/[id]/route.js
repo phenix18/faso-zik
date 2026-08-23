@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 async function ownedPlaylist(id) {
   const user = await currentUser();
-  const playlist = getPlaylist(id);
+  const playlist = await getPlaylist(id);
   if (!playlist) return { error: fail("Playlist introuvable.", 404) };
   if (!user || playlist.user_id !== user.id) {
     return { error: fail("Cette playlist ne vous appartient pas.", 403) };
@@ -21,7 +21,7 @@ async function ownedPlaylist(id) {
 }
 
 export async function GET(_request, { params }) {
-  const playlist = getPlaylist(params.id);
+  const playlist = await getPlaylist(params.id);
   if (!playlist) return fail("Playlist introuvable.", 404);
 
   if (!playlist.isPublic) {
@@ -41,8 +41,8 @@ export async function POST(request, { params }) {
   return json({
     playlist:
       action === "remove"
-        ? removeFromPlaylist(params.id, trackId)
-        : addToPlaylist(params.id, trackId),
+        ? await removeFromPlaylist(params.id, trackId)
+        : await addToPlaylist(params.id, trackId),
   });
 }
 
@@ -50,6 +50,6 @@ export async function DELETE(_request, { params }) {
   const { error } = await ownedPlaylist(params.id);
   if (error) return error;
 
-  deletePlaylist(params.id);
+  await deletePlaylist(params.id);
   return json({ ok: true });
 }

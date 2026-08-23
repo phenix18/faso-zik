@@ -53,7 +53,7 @@ export default function Navbar() {
           {session?.user ? (
             <>
               <Link
-                href="/studio"
+                href="/compte"
                 className="hidden text-sm font-semibold text-white/70 hover:text-white sm:block"
               >
                 {session.user.name}

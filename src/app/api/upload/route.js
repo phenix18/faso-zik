@@ -1,83 +1,120 @@
-import path from "node:path";
+import { z } from "zod";
 import { currentUser } from "@/lib/auth";
 import { getArtistByUserId } from "@/lib/repo/artists";
 import { createTrack } from "@/lib/repo/tracks";
-import { MEDIA_ROOT, removeMedia, saveUpload } from "@/lib/storage";
+import { albumParId } from "@/lib/repo/albums";
+import { cheminValide, nettoyerObjets } from "@/lib/storage";
+import { clientKey, rateLimit, tooManyRequests } from "@/lib/rateLimit";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
 
-/** Lit la duree (et le BPM s'il est balise) depuis les tags du fichier. */
-async function readMetadata(relativePath) {
-  try {
-    const { parseFile } = await import("music-metadata");
-    const meta = await parseFile(path.join(MEDIA_ROOT, relativePath), { duration: true });
-    return {
-      duration: Math.round(meta.format?.duration || 0),
-      bpm: meta.common?.bpm ? Number(meta.common.bpm) : null,
-    };
-  } catch {
-    // Un conteneur illisible par les tags reste diffusable : on n'echoue pas.
-    return { duration: 0, bpm: null };
-  }
-}
+const schema = z.object({
+  title: z.string().min(1, "Le titre est obligatoire.").max(160),
+  kind: z.enum(["audio", "video"]),
+  mediaPath: z.string(),
+  mediaMime: z.string().max(100),
+  mediaSize: z.number().int().positive(),
+  previewPath: z.string().optional(),
+  previewMime: z.string().max(100).optional(),
+  previewSize: z.number().int().positive().optional(),
+  coverPath: z.string().optional(),
+  duration: z.number().nonnegative().optional(),
+  bpm: z.number().min(30).max(300).nullable().optional(),
+  genre: z.string().max(60).optional(),
+  language: z.string().max(60).optional(),
+  description: z.string().max(2000).optional(),
+  musicKey: z.string().max(10).optional(),
+  license: z.string().max(160).optional(),
+  priceCfa: z.number().int().min(0).max(500000).optional(),
+  albumId: z.string().optional(),
+  trackNo: z.number().int().min(1).max(999).nullable().optional(),
+  allowDownload: z.boolean().optional(),
+  allowDj: z.boolean().optional(),
+  published: z.boolean().optional(),
+  rightsConfirmed: z.boolean(),
+});
 
+/**
+ * Enregistrement d'un titre, une fois les fichiers deposes.
+ *
+ * Les chemins recus viennent du navigateur : ils sont donc revalides ici. Un
+ * chemin invente ne passe pas la forme attendue, et de toute facon aucune
+ * adresse d'envoi n'aurait ete signee pour lui.
+ */
 export async function POST(request) {
+  const limite = await rateLimit(clientKey(request, "publication"), {
+    limit: 20,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!limite.allowed) {
+    return tooManyRequests(limite.retryAfter, "Trop de publications consecutives.");
+  }
+
   const user = await currentUser();
   if (!user) return fail("Connectez-vous pour publier un titre.", 401);
 
-  const artist = getArtistByUserId(user.id);
-  if (!artist) {
-    return fail("Ce compte n'est pas un compte artiste. Ouvrez votre espace artiste d'abord.", 403);
-  }
+  const artiste = await getArtistByUserId(user.id);
+  if (!artiste) return fail("Ce compte n'est pas un compte artiste.", 403);
 
-  const form = await request.formData();
-  const media = form.get("media");
-  const cover = form.get("cover");
-  const title = String(form.get("title") || "").trim();
-
-  if (!title) return fail("Le titre est obligatoire.", 422);
-  if (!media || typeof media === "string") return fail("Aucun fichier audio ou video recu.", 422);
-
-  const kind = media.type?.startsWith("video/") ? "video" : "audio";
-
-  let saved;
-  let coverUrl = null;
+  let corps;
   try {
-    saved = await saveUpload(media, kind);
-    if (cover && typeof cover !== "string" && cover.size > 0) {
-      const savedCover = await saveUpload(cover, "image");
-      coverUrl = `/api/asset/${savedCover.relativePath.split(path.sep).join("/")}`;
-    }
-  } catch (error) {
-    if (saved) await removeMedia(saved.relativePath);
-    return fail(error.message, 422);
+    corps = schema.parse(await request.json());
+  } catch (erreur) {
+    return fail(erreur.errors?.[0]?.message || "Donnees invalides.", 422);
   }
 
-  const meta = await readMetadata(saved.relativePath);
-  const bool = (name) => form.get(name) === "true" || form.get(name) === "on";
+  // Sans declaration de droits, rien n'entre au catalogue : c'est la seule
+  // trace que le deposant assume la paternite de ce qu'il publie.
+  if (!corps.rightsConfirmed) {
+    return fail(
+      "Vous devez declarer detenir les droits sur cet enregistrement avant de le publier.",
+      422,
+    );
+  }
 
-  const track = createTrack({
-    artistId: artist.id,
-    title,
-    kind,
-    genre: form.get("genre") || null,
-    language: form.get("language") || null,
-    description: form.get("description") || null,
-    duration: meta.duration,
-    bpm: form.get("bpm") ? Number(form.get("bpm")) : meta.bpm,
-    musicKey: form.get("musicKey") || null,
-    coverUrl,
-    mediaPath: saved.relativePath,
-    mediaMime: saved.mime,
-    mediaSize: saved.size,
-    allowDownload: bool("allowDownload"),
-    allowDj: bool("allowDj"),
-    license: form.get("license") || undefined,
-    published: form.get("published") !== "false",
-  });
+  for (const chemin of [corps.mediaPath, corps.previewPath, corps.coverPath].filter(Boolean)) {
+    if (!cheminValide(chemin)) return fail("Chemin de fichier invalide.", 422);
+  }
 
-  return json({ track }, 201);
+  // Un album ne peut recevoir un titre que s'il appartient au meme artiste.
+  const albumDemande = corps.albumId ? await albumParId(corps.albumId) : null;
+  const album = albumDemande?.artist_id === artiste.id ? albumDemande : null;
+
+  try {
+    const track = await createTrack({
+      artistId: artiste.id,
+      albumId: album?.id || null,
+      trackNo: album ? corps.trackNo || null : null,
+      title: corps.title,
+      kind: corps.kind,
+      genre: corps.genre || null,
+      language: corps.language || null,
+      description: corps.description || null,
+      duration: corps.duration || 0,
+      bpm: corps.bpm ?? null,
+      musicKey: corps.musicKey || null,
+      coverUrl: corps.coverPath ? `/api/asset/${corps.coverPath}` : null,
+      mediaPath: corps.mediaPath,
+      mediaMime: corps.mediaMime,
+      mediaSize: corps.mediaSize,
+      previewPath: corps.previewPath || null,
+      previewMime: corps.previewMime || null,
+      previewSize: corps.previewSize || null,
+      allowDownload: corps.allowDownload,
+      allowDj: corps.allowDj,
+      license: corps.license || undefined,
+      priceCfa: corps.priceCfa || 0,
+      published: corps.published !== false,
+      rightsConfirmed: true,
+    });
+
+    return json({ track }, 201);
+  } catch (erreur) {
+    // Le morceau n'est pas entre : les fichiers deja deposes n'ont plus de
+    // raison d'occuper le stockage.
+    await nettoyerObjets([corps.mediaPath, corps.previewPath, corps.coverPath]);
+    return fail(`Publication impossible : ${erreur.message}`, 500);
+  }
 }

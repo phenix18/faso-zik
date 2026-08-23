@@ -4,15 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import UploadForm from "@/components/studio/UploadForm";
 import TrackManagerRow from "@/components/studio/TrackManagerRow";
+import RevenusArtiste from "@/components/studio/RevenusArtiste";
+import AlbumsArtiste from "@/components/studio/AlbumsArtiste";
 import { formatCount } from "@/lib/format";
 
 const TABS = [
   ["catalogue", "Mon catalogue"],
   ["publier", "Publier un titre"],
+  ["albums", "Mes albums"],
+  ["revenus", "Mes revenus"],
   ["profil", "Ma fiche artiste"],
 ];
 
-export default function StudioClient({ artist, initialTracks, stats }) {
+export default function StudioClient({ artist, initialTracks, stats, revenus, paiements, albums }) {
   const [tab, setTab] = useState("catalogue");
   const [tracks, setTracks] = useState(initialTracks);
 
@@ -93,8 +97,17 @@ export default function StudioClient({ artist, initialTracks, stats }) {
       )}
 
       {tab === "publier" && (
-        <UploadForm onPublished={(track) => setTracks((list) => [track, ...list])} />
+        <UploadForm
+          albums={albums}
+          onPublished={(track) => setTracks((list) => [track, ...list])}
+        />
       )}
+
+      {tab === "albums" && (
+        <AlbumsArtiste artiste={artist} albumsInitiaux={albums} titres={tracks} />
+      )}
+
+      {tab === "revenus" && <RevenusArtiste revenus={revenus} paiements={paiements} />}
 
       {tab === "profil" && <ProfileForm artist={artist} />}
     </div>

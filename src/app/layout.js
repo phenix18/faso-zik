@@ -1,13 +1,9 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "@/redux/Providers";
-import Navbar from "@/components/Navbar";
-import Sidebar from "@/components/Sidebar";
-import GlobalPlayer from "@/components/player/GlobalPlayer";
+import { SITE_URL } from "@/lib/siteConfig";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
@@ -33,6 +29,16 @@ export const metadata = {
       "Ecoutez, regardez et mixez les artistes du Faso. Telechargement sous autorisation de l'artiste.",
   },
   robots: { index: true, follow: true },
+  manifest: "/manifest.json",
+  icons: {
+    icon: [{ url: "/favicon.png", type: "image/png" }],
+    apple: [{ url: "/icone-192.png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "FASO-ZIK",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport = {
@@ -46,14 +52,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="fr" className={inter.variable}>
       <body className="min-h-screen bg-faso-ink font-sans antialiased">
-        <Providers>
-          <Sidebar />
-          <div className="lg:pl-60">
-            <Navbar />
-            <main className="mx-auto max-w-[1600px] px-3 pb-40 pt-4 sm:px-5">{children}</main>
-          </div>
-          <GlobalPlayer />
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

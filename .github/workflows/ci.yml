@@ -1,0 +1,45 @@
+name: Controles
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une nouvelle poussee sur la meme branche annule le controle en cours.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Lint, tests et build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dependances
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Verifier les icones importees
+        run: npm run check
+
+      # Les tests montent un PostgreSQL en memoire (PGlite) : aucun service a
+      # demarrer ici. Le jeu de demonstration, lui, exige un stockage objet ;
+      # tests/scripts.test.js verifie qu'il se charge, sans le derouler.
+      - name: Tests
+        run: npm test
+
+      - name: Build de production
+        run: npm run build
+        env:
+          NEXTAUTH_SECRET: secret-de-controle-continu
+          NEXTAUTH_URL: http://localhost:3000

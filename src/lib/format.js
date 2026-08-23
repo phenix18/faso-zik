@@ -23,3 +23,9 @@ export function formatCount(value) {
   if (n < 1000000) return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)} k`;
   return `${(n / 1000000).toFixed(1)} M`;
 }
+
+/** Montants en francs CFA : pas de decimales, espace insecable avant l'unite. */
+export function formatCfa(montant) {
+  const valeur = Math.round(Number(montant) || 0);
+  return `${valeur.toLocaleString("fr-FR").replace(/\u202f/g, "\u00a0")}\u00a0F\u00a0CFA`;
+}
