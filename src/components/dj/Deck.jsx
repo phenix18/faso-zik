@@ -7,6 +7,7 @@ import {
   HiPlay,
 } from "react-icons/hi2";
 import Waveform from "@/components/dj/Waveform";
+import Spectre from "@/components/dj/Spectre";
 import Cover from "@/components/Cover";
 import { formatDuration } from "@/lib/format";
 
@@ -17,7 +18,17 @@ export default function Deck({ deck, colour, accent, onSync, syncTarget }) {
   const pitchPercent = (deck.rate - 1) * 100;
 
   return (
-    <section className="card flex flex-col gap-3" aria-label={`Platine ${deck.label}`}>
+    <section
+      className="card flex flex-col gap-3 transition-shadow duration-300"
+      // La platine en lecture se signale d'elle-meme : dans la penombre d'une
+      // cabine, on doit voir laquelle sonne sans avoir a lire.
+      style={
+        deck.playing
+          ? { boxShadow: `0 0 26px -8px ${colour}66`, borderColor: `${colour}55` }
+          : undefined
+      }
+      aria-label={`Platine ${deck.label}`}
+    >
       <header className="flex items-center gap-3">
         <span
           className={`flex h-7 w-7 items-center justify-center rounded font-black text-black ${accent}`}
@@ -62,6 +73,8 @@ export default function Deck({ deck, colour, accent, onSync, syncTarget }) {
         colour={colour}
         onSeek={deck.seek}
       />
+
+      <Spectre analyser={deck.analyser} actif={deck.playing} teinte={colour} />
 
       <div className="flex items-center justify-between text-xs tabular-nums text-white/50">
         <span>{formatDuration(deck.position)}</span>
@@ -173,6 +186,31 @@ export default function Deck({ deck, colour, accent, onSync, syncTarget }) {
               onDoubleClick={() => deck.setFilter(0)}
               aria-label={`Filtre platine ${deck.label}`}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              ["Echo", deck.echoMix, deck.setEchoMix, "l'echo se cale sur le tempo joue"],
+              ["Reverb", deck.reverbMix, deck.setReverbMix, "profondeur de salle"],
+            ].map(([label, valeur, poser, aide]) => (
+              <div key={label}>
+                <p className="mb-1 flex items-baseline justify-between text-[11px] text-white/45">
+                  <span className={valeur > 0.02 ? "font-semibold text-faso-gold" : ""}>{label}</span>
+                  <span className="tabular-nums">{Math.round(valeur * 100)}%</span>
+                </p>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.9}
+                  step={0.01}
+                  value={valeur}
+                  onChange={(event) => poser(Number(event.target.value))}
+                  onDoubleClick={() => poser(0)}
+                  title={aide}
+                  aria-label={`${label} platine ${deck.label}`}
+                />
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">

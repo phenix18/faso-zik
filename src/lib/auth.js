@@ -1,7 +1,8 @@
 import CredentialsProvider from "next-auth/providers/credentials";
 import { getServerSession } from "next-auth";
-import { findUserByEmail, findUserById, verifyPassword } from "@/lib/repo/users";
+import { findUserByEmail, verifyPassword } from "@/lib/repo/users";
 import { getArtistByUserId } from "@/lib/repo/artists";
+import { rafraichirJeton, roleALaConnexion } from "@/lib/session";
 
 export const authOptions = {
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
@@ -17,7 +18,9 @@ export const authOptions = {
       async authorize(credentials) {
         const user = await findUserByEmail(credentials?.email);
         if (!user || !verifyPassword(user, credentials?.password || "")) return null;
-        return { id: user.id, name: user.name, email: user.email, role: user.role };
+
+        const role = await roleALaConnexion(user);
+        return { id: user.id, name: user.name, email: user.email, role };
       },
     }),
   ],
@@ -25,11 +28,7 @@ export const authOptions = {
     async jwt({ token, user }) {
       if (user) token.uid = user.id;
       if (token.uid) {
-        // Le role et la fiche artiste peuvent changer en cours de session
-        // (passage auditeur -> artiste) : on les relit a chaque rafraichissement.
-        const fresh = await findUserById(token.uid);
-        token.role = fresh?.role || "auditeur";
-        token.artistId = await getArtistByUserId(token.uid)?.id || null;
+        Object.assign(token, await rafraichirJeton(token.uid));
       }
       return token;
     },

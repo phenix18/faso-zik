@@ -32,7 +32,14 @@ export async function GET(_request, { params }) {
     return fail("L'artiste n'autorise pas le telechargement de ce titre.", 403);
   }
 
+  // L'ecoute est libre, le telechargement non : un fichier qui quitte le site
+  // suit son propre chemin ensuite. L'artiste doit au moins savoir a qui il
+  // l'a confie, et un compte est ce qui rend un retrait ou un litige tracable.
   const user = await currentUser();
+  if (!user) {
+    return fail("Creez un compte ou connectez-vous pour telecharger ce titre.", 401);
+  }
+
   if (estPayant(row)) {
     const paye = await aAchete(user?.id, row.id);
     if (!peutTelecharger(row, { user, dejaPaye: paye })) {

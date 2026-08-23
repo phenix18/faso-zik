@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { query } from "@/lib/db";
+import { currentUser } from "@/lib/auth";
 import { toPublicTrack } from "@/lib/repo/tracks";
 import DjConsole from "@/components/dj/DjConsole";
 
@@ -10,6 +12,12 @@ export const metadata = {
 };
 
 export default async function DjPage() {
+  // La platine charge les morceaux entiers en memoire pour pouvoir sauter,
+  // boucler et tracer la forme d'onde. C'est un usage bien plus lourd que
+  // l'ecoute, et un usage professionnel : il se fait avec un compte.
+  const user = await currentUser();
+  if (!user) redirect("/connexion?callbackUrl=/dj");
+
   const rows = await query(
     `SELECT t.*, a.name AS artist_name, a.slug AS artist_slug,
             a.photo_url AS artist_photo, a.verified AS artist_verified,

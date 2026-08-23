@@ -7,6 +7,7 @@ import TrackList from "@/components/TrackList";
 import SectionHeader from "@/components/SectionHeader";
 import Cover from "@/components/Cover";
 import DonneesStructurees from "@/components/DonneesStructurees";
+import Commentaires from "@/components/Commentaires";
 import { SITE_NAME, SITE_URL } from "@/lib/siteConfig";
 import { formatCount, formatDuration, formatSize } from "@/lib/format";
 
@@ -152,6 +153,8 @@ export default async function TrackPage({ params }) {
           </section>
         </div>
       </article>
+
+      <Commentaires trackId={track.id} artistId={track.artist.id} />
 
       {sameArtist.length > 0 && (
         <section>

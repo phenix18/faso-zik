@@ -6,9 +6,10 @@ import toast from "react-hot-toast";
 import { HiCheckBadge, HiEyeSlash } from "react-icons/hi2";
 import { formatCount } from "@/lib/format";
 
-export default function AdminClient({ resume, artistes, titres }) {
+export default function AdminClient({ resume, artistes, titres, commentaires = [] }) {
   const [liste, setListe] = useState(artistes);
   const [catalogue, setCatalogue] = useState(titres);
+  const [discussions, setDiscussions] = useState(commentaires);
   const [enCours, setEnCours] = useState(null);
 
   const cartes = [
@@ -20,7 +21,7 @@ export default function AdminClient({ resume, artistes, titres }) {
   ];
 
   async function agir(corps, surSucces) {
-    setEnCours(corps.artistId || corps.trackId);
+    setEnCours(corps.artistId || corps.trackId || corps.commentId);
     try {
       const reponse = await fetch("/api/admin", {
         method: "POST",
@@ -147,6 +148,58 @@ export default function AdminClient({ resume, artistes, titres }) {
             </div>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2 className="section-title mb-3">Derniers commentaires</h2>
+        {discussions.length === 0 ? (
+          <p className="text-sm text-white/40">Aucun commentaire pour l&apos;instant.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {discussions.map((commentaire) => (
+              <div
+                key={commentaire.id}
+                className={`flex items-start justify-between gap-3 rounded-lg border border-faso-line bg-black/25 p-3 ${
+                  commentaire.masque ? "opacity-45" : ""
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="text-xs text-white/45">
+                    <span className="font-semibold text-white/70">{commentaire.auteur.nom}</span>
+                    {" sous "}
+                    <Link href={`/titre/${commentaire.trackId}`} className="hover:text-faso-gold">
+                      {commentaire.titre}
+                    </Link>
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/75">
+                    {commentaire.corps}
+                  </p>
+                </div>
+                {commentaire.masque ? (
+                  <span className="chip shrink-0">Masque</span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={enCours === commentaire.id}
+                    onClick={() =>
+                      agir({ action: "masquer-commentaire", commentId: commentaire.id }, () => {
+                        setDiscussions((actuelle) =>
+                          actuelle.map((item) =>
+                            item.id === commentaire.id ? { ...item, masque: true } : item,
+                          ),
+                        );
+                        toast.success("Commentaire masque.");
+                      })
+                    }
+                    className="btn-ghost shrink-0 !px-3 !py-1.5 !text-faso-red"
+                  >
+                    <HiEyeSlash /> Masquer
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

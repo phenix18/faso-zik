@@ -92,6 +92,10 @@ export async function changerNom(userId, nom) {
   return findUserById(userId);
 }
 
+export async function promouvoirAdmin(userId) {
+  await execute("UPDATE users SET role = 'admin' WHERE id = $1", [userId]);
+}
+
 export async function supprimerCompte(userId) {
   await execute("DELETE FROM users WHERE id = $1", [userId]);
 }

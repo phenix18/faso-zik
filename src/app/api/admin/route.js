@@ -1,5 +1,6 @@
 import { currentUser } from "@/lib/auth";
 import { basculerVerification, retirerTitre } from "@/lib/repo/admin";
+import { masquerCommentaire } from "@/lib/repo/comments";
 import { fail, json } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -14,10 +15,10 @@ async function exigerAdmin() {
 }
 
 export async function POST(request) {
-  const { erreur } = await exigerAdmin();
+  const { erreur, user } = await exigerAdmin();
   if (erreur) return erreur;
 
-  const { action, artistId, trackId } = await request.json();
+  const { action, artistId, trackId, commentId } = await request.json();
 
   if (action === "verifier") {
     if (!artistId) return fail("Identifiant d'artiste manquant.", 422);
@@ -30,6 +31,12 @@ export async function POST(request) {
     if (!trackId) return fail("Identifiant de titre manquant.", 422);
     await retirerTitre(trackId);
     return json({ retire: true });
+  }
+
+  if (action === "masquer-commentaire") {
+    if (!commentId) return fail("Identifiant de commentaire manquant.", 422);
+    await masquerCommentaire(commentId, user.id);
+    return json({ masque: true });
   }
 
   return fail("Action inconnue.", 422);
