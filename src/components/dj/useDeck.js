@@ -31,6 +31,8 @@ export default function useDeck(context, destination, label) {
   const [volume, setVolume] = useState(0.85);
   const [eq, setEq] = useState({ low: 0, mid: 0, high: 0 });
   const [filter, setFilter] = useState(0);
+  const [echoMix, setEchoMix] = useState(0);
+  const [reverbMix, setReverbMix] = useState(0);
   const [cuePoint, setCuePoint] = useState(0);
   const [loop, setLoopState] = useState(null);
   const [error, setError] = useState(null);
@@ -60,10 +62,55 @@ export default function useDeck(context, destination, label) {
     const analyser = context.createAnalyser();
     analyser.fftSize = 256;
 
-    low.connect(mid).connect(high).connect(colour).connect(gain).connect(analyser);
+    // --- Effets d'ambiance, montes en parallele -------------------------
+    // En serie, ils coloreraient le son meme a zero. En parallele, leur
+    // depart est un robinet : ferme, la chaine seche passe intacte.
+
+    // Echo. Le delai se cale sur le tempo du morceau (voir plus bas) : un
+    // echo qui tombe a cote du temps salit un mix au lieu de le porter.
+    const echo = context.createDelay(2);
+    echo.delayTime.value = 0.375;
+    const echoRetour = context.createGain();
+    echoRetour.gain.value = 0.38; // reinjection : trop haut, l'echo s'emballe
+    const echoDepart = context.createGain();
+    echoDepart.gain.value = 0;
+    const echoTon = context.createBiquadFilter();
+    echoTon.type = "lowpass";
+    echoTon.frequency.value = 2600; // chaque repetition s'assombrit, comme un vrai delai
+
+    echo.connect(echoTon).connect(echoRetour).connect(echo);
+    echoDepart.connect(echo);
+
+    // Reverberation. La reponse impulsionnelle est fabriquee ici plutot que
+    // telechargee : un fichier de plus a servir pour un bruit decroissant.
+    const reverb = context.createConvolver();
+    const duree = 2.4;
+    const echantillons = Math.floor(context.sampleRate * duree);
+    const empreinte = context.createBuffer(2, echantillons, context.sampleRate);
+    for (let canal = 0; canal < 2; canal += 1) {
+      const donnees = empreinte.getChannelData(canal);
+      for (let i = 0; i < echantillons; i += 1) {
+        // Bruit qui decroit : la queue d'une salle.
+        donnees[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / echantillons, 2.6);
+      }
+    }
+    reverb.buffer = empreinte;
+    const reverbDepart = context.createGain();
+    reverbDepart.gain.value = 0;
+    reverbDepart.connect(reverb);
+
+    low.connect(mid).connect(high).connect(colour).connect(gain);
+    gain.connect(analyser);
+    gain.connect(echoDepart);
+    gain.connect(reverbDepart);
+    echoTon.connect(analyser);
+    reverb.connect(analyser);
     analyser.connect(destination);
 
-    chainRef.current = { low, mid, high, colour, gain, analyser, input: low };
+    chainRef.current = {
+      low, mid, high, colour, gain, analyser, input: low,
+      echo, echoDepart, reverbDepart,
+    };
   }
 
   /* ------------------------------ reglages ------------------------------ */
@@ -96,6 +143,16 @@ export default function useDeck(context, destination, label) {
       chain.colour.frequency.value = 22000 * Math.pow(0.005, -filter); // 22 kHz -> 110 Hz
     }
   }, [filter]);
+
+  useEffect(() => {
+    const chain = chainRef.current;
+    if (chain) chain.echoDepart.gain.value = echoMix;
+  }, [echoMix]);
+
+  useEffect(() => {
+    const chain = chainRef.current;
+    if (chain) chain.reverbDepart.gain.value = reverbMix;
+  }, [reverbMix]);
 
   useEffect(() => {
     if (sourceRef.current) sourceRef.current.playbackRate.value = rate;
@@ -285,6 +342,15 @@ export default function useDeck(context, destination, label) {
   useEffect(() => () => stopSource(), [stopSource]);
 
   const baseBpm = track?.bpm || null;
+  const effectiveBpm = baseBpm ? baseBpm * rate : null;
+
+  // L'echo se cale sur la croche pointee du tempo joue — la valeur qui fait
+  // "respirer" un mix. Sans tempo connu, on garde une valeur de repli.
+  useEffect(() => {
+    const chain = chainRef.current;
+    if (!chain) return;
+    chain.echo.delayTime.value = effectiveBpm ? (60 / effectiveBpm) * 0.75 : 0.375;
+  }, [effectiveBpm]);
 
   return {
     label,
@@ -304,11 +370,15 @@ export default function useDeck(context, destination, label) {
     setEq,
     filter,
     setFilter,
+    echoMix,
+    setEchoMix,
+    reverbMix,
+    setReverbMix,
     cuePoint,
     loop,
     setLoop,
     baseBpm,
-    effectiveBpm: baseBpm ? baseBpm * rate : null,
+    effectiveBpm,
     analyser: chainRef.current?.analyser || null,
     load,
     eject,

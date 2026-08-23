@@ -2,6 +2,7 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import GlobalPlayer from "@/components/player/GlobalPlayer";
 import ServiceWorker from "@/components/ServiceWorker";
+import PiedDePage from "@/components/PiedDePage";
 
 /**
  * Coquille du site : navigation et lecteur global.
@@ -16,7 +17,10 @@ export default function SiteLayout({ children }) {
       <Sidebar />
       <div className="lg:pl-60">
         <Navbar />
-        <main className="mx-auto max-w-[1600px] px-3 pb-40 pt-4 sm:px-5">{children}</main>
+        <main className="mx-auto max-w-[1600px] px-3 pt-4 sm:px-5">{children}</main>
+        <div className="pb-40">
+          <PiedDePage />
+        </div>
       </div>
       <GlobalPlayer />
       <ServiceWorker />

@@ -145,6 +145,20 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 -- Compteur de debit partage. En memoire, il ne servait a rien des lors que
+-- Commentaires du public sous un morceau. Ecrire demande un compte : c'est ce
+-- qui rend la moderation possible, et ce qui decourage le deversement. Un
+-- commentaire retire n'est pas efface mais masque, pour qu'un retrait conteste
+-- puisse etre revu, et qu'on sache qui l'a decide.
+CREATE TABLE IF NOT EXISTS comments (
+  id         TEXT PRIMARY KEY,
+  track_id   TEXT NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  corps      TEXT NOT NULL,
+  masque     BOOLEAN NOT NULL DEFAULT FALSE,
+  masque_par TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- plusieurs instances repondent : chacune aurait eu le sien.
 CREATE TABLE IF NOT EXISTS rate_limits (
   cle        TEXT PRIMARY KEY,
@@ -164,4 +178,5 @@ CREATE INDEX IF NOT EXISTS idx_follows_artist  ON follows(artist_id);
 CREATE INDEX IF NOT EXISTS idx_payments_artist ON payments(artist_id, status);
 CREATE INDEX IF NOT EXISTS idx_payments_achat  ON payments(user_id, track_id, status);
 CREATE INDEX IF NOT EXISTS idx_rate_limits_exp ON rate_limits(expire_a);
+CREATE INDEX IF NOT EXISTS idx_comments_track  ON comments(track_id, created_at DESC);
 `;

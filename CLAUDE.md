@@ -2,6 +2,17 @@
 
 ## Ce qu'il faut savoir avant de toucher au code
 
+**Qui doit avoir un compte, et qui non.** L'ecoute est libre et anonyme —
+c'est ce qui fait entrer les auditeurs. Le telechargement, les commentaires et
+la platine demandent un compte : le premier parce qu'un fichier qui part suit
+son propre chemin, le deuxieme parce qu'une moderation sans identite n'existe
+pas, la troisieme parce qu'elle charge des morceaux entiers en memoire. Le
+refus vient du serveur, jamais d'un bouton masque.
+
+**Le role d'administrateur ne s'attribue par aucune page.** Il vient de
+`npm run admin` ou de la variable `ADMIN_EMAILS`, et seulement apres une
+authentification reussie.
+
 **Les autorisations sont la regle centrale.** Trois drapeaux par morceau —
 `allow_stream`, `allow_download`, `allow_dj` — plus `price_cfa` pour la vente.
 Ils se verifient dans `src/lib/permissions.js`, appele par les routes serveur.
@@ -31,7 +42,7 @@ ailleurs, et tout y est asynchrone.
 
 ```sh
 npm run dev      # developpement
-npm test         # 99 tests, sans dependance de test
+npm test         # 107 tests, sans dependance de test
 npm run check    # verifie que les icones importees existent
 npm run verifier # controle d'installation : appelle vraiment la base et le stockage
 npm run lint
