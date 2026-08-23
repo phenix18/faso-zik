@@ -47,6 +47,17 @@ async function ouvrir() {
     };
   }
 
+  // PGlite en production serait pire qu'une panne : sans DATABASE_URL, chaque
+  // instance ouvrirait sa propre base vide, en memoire. Le site aurait l'air de
+  // fonctionner tout en perdant les comptes et le catalogue a chaque requete.
+  // Un refus franc vaut mieux qu'une perte silencieuse.
+  if (process.env.NODE_ENV === "production" && process.env.PGLITE_EN_PRODUCTION !== "oui") {
+    throw new Error(
+      "DATABASE_URL absent : renseignez une base PostgreSQL. " +
+        "La base en memoire ne conserve rien et n'est pas partagee entre les instances.",
+    );
+  }
+
   const { PGlite } = await import("@electric-sql/pglite");
   const chemin = process.env.PGLITE_DIR || undefined; // en memoire par defaut
   const pglite = await PGlite.create(chemin);
@@ -68,7 +79,14 @@ async function ouvrir() {
   };
 }
 
-/** Ouvre la connexion et applique le schema, une seule fois par processus. */
+/**
+ * Ouvre la connexion et applique le schema, une seule fois par processus.
+ *
+ * L'ouverture en cours est mise de cote pour que deux requetes simultanees
+ * n'ouvrent pas deux connexions. Un echec, lui, ne doit pas rester en memoire :
+ * une base momentanement injoignable condamnerait sinon l'instance jusqu'a son
+ * arret, chaque appel suivant recevant l'erreur de la premiere tentative.
+ */
 export async function getDb() {
   if (connexion) return connexion;
   if (!preparation) {
@@ -77,7 +95,10 @@ export async function getDb() {
       await base.exec(schema);
       connexion = base;
       return base;
-    })();
+    })().catch((erreur) => {
+      preparation = null;
+      throw erreur;
+    });
   }
   return preparation;
 }

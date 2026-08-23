@@ -91,7 +91,7 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 97 tests : autorisations, stockage et adresses signees, chemins de medias, limitation de debit, catalogue, albums, paiements, abonnements, mots de passe, identifiants, scripts |
+| `npm test` | 99 tests : autorisations, stockage et adresses signees, chemins de medias, limitation de debit, catalogue, albums, paiements, abonnements, mots de passe, identifiants, scripts |
 | `npm run seed` | jeu de demonstration (idempotent, demande le stockage objet) |
 | `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
 | `npm run check` | verifie que toutes les icones importees existent |
@@ -307,7 +307,7 @@ Build de production, puis parcours reels contre le serveur demarre :
   `Retry-After` ; 12 tentatives de connexion passent, les suivantes `429` ;
 - depot refuse en `422` sans declaration de droits, accepte avec, y compris en
   appelant l'API directement sans passer par le formulaire ;
-- **97 tests automatises** (`npm test`, sans dependance de test) sur les
+- **99 tests automatises** (`npm test`, sans dependance de test) sur les
   autorisations, la resolution des chemins de medias, la limitation de debit,
   le catalogue, les albums, les paiements, les abonnements, les mots de passe
   et les scripts en ligne de commande. Leur utilite a ete controlee en
