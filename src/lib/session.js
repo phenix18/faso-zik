@@ -47,8 +47,20 @@ export async function roleALaConnexion(user) {
 export async function rafraichirJeton(uid) {
   const compte = await findUserById(uid);
   const artiste = await getArtistByUserId(uid);
+
+  // La promotion est aussi tentee ici, pas seulement a la connexion : sans
+  // cela, une adresse ajoutee a ADMIN_EMAILS pendant qu'on est deja connecte
+  // ne prendrait effet qu'apres une deconnexion — piege silencieux, ou l'on
+  // croit la variable inoperante. La session a deja ete etablie par un mot de
+  // passe verifie ; c'est le meme niveau de preuve.
+  let role = compte?.role || "auditeur";
+  if (compte && role !== "admin" && adressesAdmin().includes(String(compte.email).toLowerCase())) {
+    await promouvoirAdmin(compte.id);
+    role = "admin";
+  }
+
   return {
-    role: compte?.role || "auditeur",
+    role,
     // Les parentheses comptent : `await f()?.id` applique `.id` a la promesse
     // et vaut toujours undefined. L'artiste n'etait alors jamais reconnu
     // proprietaire de ses propres titres, et ne pouvait plus les modifier.

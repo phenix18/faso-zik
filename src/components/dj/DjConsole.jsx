@@ -96,18 +96,26 @@ export default function DjConsole({ tracks }) {
 
   if (!engine) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <h1 className="text-2xl font-black text-white">Platine DJ FASO-ZIK</h1>
-        <p className="max-w-lg text-sm text-white/50">
-          Deux platines, un crossfader, un egaliseur trois bandes, des boucles calees au tempo et
-          un bac a disques limite aux titres que les artistes ont ouverts au mix.
-        </p>
-        <button ref={startRef} type="button" onClick={start} className="btn-primary !px-6 !py-3">
-          <HiSpeakerWave className="text-lg" /> Demarrer la console
-        </button>
-        <p className="text-xs text-white/30">
-          {tracks.length} titre(s) disponible(s) pour le mix.
-        </p>
+      <div className="mx-auto flex max-w-3xl flex-col gap-6 py-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <h1 className="text-2xl font-black text-white">Platine DJ FASO-ZIK</h1>
+          <p className="max-w-lg text-sm text-white/50">
+            Deux platines, un crossfader, un egaliseur trois bandes, echo et reverberation, des
+            boucles calees au tempo et un bac a disques limite aux titres que les artistes ont
+            ouverts au mix. L&apos;acces est libre, sans compte.
+          </p>
+          <button ref={startRef} type="button" onClick={start} className="btn-primary !px-6 !py-3">
+            <HiSpeakerWave className="text-lg" /> Demarrer la console
+          </button>
+          <p className="text-xs text-white/30">
+            {tracks.length} titre(s) disponible(s) pour le mix. Le navigateur exige ce clic avant
+            de laisser un site produire du son.
+          </p>
+        </div>
+
+        {/* La source YouTube n'a pas besoin du moteur audio : elle reste
+            accessible avant meme d'avoir demarre la console. */}
+        <YouTubePanneau />
       </div>
     );
   }
