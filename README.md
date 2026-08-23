@@ -91,7 +91,7 @@ Comptes de demonstration — mot de passe `fasozik2024` :
 | Commande | Role |
 |---|---|
 | `npm run dev` / `build` / `start` | cycle Next.js habituel |
-| `npm test` | 110 tests : autorisations, stockage et adresses signees, chemins de medias, limitation de debit, catalogue, albums, paiements, abonnements, mots de passe, identifiants, scripts |
+| `npm test` | 117 tests : autorisations, stockage et adresses signees, chemins de medias, limitation de debit, catalogue, albums, paiements, abonnements, mots de passe, identifiants, scripts |
 | `npm run seed` | jeu de demonstration (idempotent, demande le stockage objet) |
 | `npm run admin -- adresse@exemple.bf` | promeut un compte existant en administrateur |
 | `npm run check` | verifie que toutes les icones importees existent |
@@ -105,6 +105,8 @@ Voir `.env.example`. Les indispensables :
 
 - `ADMIN_EMAILS` — adresses qui obtiennent le role d'administrateur a la
   connexion ; aucune page du site ne permet de se promouvoir
+- `ADMIN_PIN` — second facteur de la console d'administration, jamais dans le
+  depot
 - `NEXTAUTH_SECRET` — cle de signature des sessions (`openssl rand -base64 32`)
 - `NEXTAUTH_URL` — URL publique du site
 - `DATABASE_URL` — connexion PostgreSQL ; vide en developpement, PGlite prend le
@@ -309,7 +311,7 @@ Build de production, puis parcours reels contre le serveur demarre :
   `Retry-After` ; 12 tentatives de connexion passent, les suivantes `429` ;
 - depot refuse en `422` sans declaration de droits, accepte avec, y compris en
   appelant l'API directement sans passer par le formulaire ;
-- **110 tests automatises** (`npm test`, sans dependance de test) sur les
+- **117 tests automatises** (`npm test`, sans dependance de test) sur les
   autorisations, la resolution des chemins de medias, la limitation de debit,
   le catalogue, les albums, les paiements, les abonnements, les mots de passe
   et les scripts en ligne de commande. Leur utilite a ete controlee en

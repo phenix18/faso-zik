@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { HiCheckBadge, HiEyeSlash } from "react-icons/hi2";
+import { HiArrowUturnLeft, HiCheckBadge, HiEyeSlash, HiLockOpen } from "react-icons/hi2";
 import { formatCount } from "@/lib/format";
 
-export default function AdminClient({ resume, artistes, titres, commentaires = [] }) {
+export default function AdminClient({ resume, artistes, titres, commentaires = [], comptes = [] }) {
   const [liste, setListe] = useState(artistes);
   const [catalogue, setCatalogue] = useState(titres);
   const [discussions, setDiscussions] = useState(commentaires);
@@ -143,10 +143,65 @@ export default function AdminClient({ resume, artistes, titres, commentaires = [
                   <HiEyeSlash /> Retirer
                 </button>
               ) : (
-                <span className="chip">Retire</span>
+                <button
+                  type="button"
+                  disabled={enCours === titre.id}
+                  onClick={() =>
+                    agir({ action: "republier", trackId: titre.id }, () => {
+                      setCatalogue((actuelle) =>
+                        actuelle.map((item) =>
+                          item.id === titre.id ? { ...item, published: true } : item,
+                        ),
+                      );
+                      toast.success("Titre remis en ligne.");
+                    })
+                  }
+                  className="btn-ghost !px-3 !py-1.5"
+                >
+                  <HiArrowUturnLeft /> Remettre
+                </button>
               )}
             </div>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="section-title mb-3">Comptes</h2>
+        <div className="overflow-x-auto rounded-lg border border-faso-line">
+          <table className="w-full min-w-[540px] text-left text-sm">
+            <thead className="bg-black/40 text-[11px] uppercase tracking-wider text-white/40">
+              <tr>
+                <th className="p-2.5">Nom</th>
+                <th className="p-2.5">Adresse</th>
+                <th className="p-2.5">Role</th>
+                <th className="p-2.5">Artiste</th>
+              </tr>
+            </thead>
+            <tbody>
+              {comptes.map((compte) => (
+                <tr key={compte.id} className="border-t border-faso-line/60">
+                  <td className="p-2.5 text-white/80">{compte.name}</td>
+                  <td className="p-2.5 text-white/45">{compte.email}</td>
+                  <td className="p-2.5">
+                    <span className={compte.role === "admin" ? "chip !text-faso-gold" : "chip"}>
+                      {compte.role}
+                    </span>
+                  </td>
+                  <td className="p-2.5 text-white/45">
+                    {compte.artiste ? (
+                      <span className="inline-flex items-center gap-1">
+                        {compte.artiste}
+                        {compte.verified && <HiCheckBadge className="text-faso-gold" />}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -200,6 +255,23 @@ export default function AdminClient({ resume, artistes, titres, commentaires = [
             ))}
           </div>
         )}
+      </section>
+
+      <section className="rounded-lg border border-faso-line bg-black/25 p-4">
+        <p className="mb-2 text-sm text-white/55">
+          La console reste ouverte huit heures. Fermez-la si vous quittez ce poste : votre session
+          du site, elle, n&apos;est pas touchee.
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            await fetch("/api/admin/pin", { method: "DELETE" });
+            window.location.reload();
+          }}
+          className="btn-ghost"
+        >
+          <HiLockOpen /> Fermer la console
+        </button>
       </section>
     </div>
   );

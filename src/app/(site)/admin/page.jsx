@@ -2,7 +2,11 @@ import Link from "next/link";
 import { currentUser } from "@/lib/auth";
 import { derniersTitres, listeArtistes, vueEnsemble } from "@/lib/repo/admin";
 import { derniersCommentaires } from "@/lib/repo/comments";
+import { listeComptes } from "@/lib/repo/admin";
+import { COOKIE_PIN, jetonPinValide, pinConfigure } from "@/lib/adminPin";
+import PortePin from "@/components/admin/PortePin";
 import AdminClient from "@/components/admin/AdminClient";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administration", robots: { index: false } };
@@ -28,12 +32,19 @@ export default async function AdminPage() {
     );
   }
 
+  // Le role ouvre la page, le code ouvre la console. Les deux sont exiges par
+  // la route serveur : cet ecran ne fait que le rendre visible.
+  if (pinConfigure() && !jetonPinValide(cookies().get(COOKIE_PIN)?.value, user.id)) {
+    return <PortePin />;
+  }
+
   return (
     <AdminClient
       resume={await vueEnsemble()}
       artistes={await listeArtistes()}
       titres={await derniersTitres(40)}
       commentaires={await derniersCommentaires(30)}
+      comptes={await listeComptes(60)}
     />
   );
 }
