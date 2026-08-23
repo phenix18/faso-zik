@@ -50,6 +50,34 @@ export async function retirerTitre(trackId) {
   await execute("UPDATE tracks SET published = FALSE WHERE id = $1", [trackId]);
 }
 
+/**
+ * Remise en ligne d'un titre retire.
+ *
+ * Le pendant de `retirerTitre` : sans lui, une reclamation infondee resterait
+ * sans recours, et le retrait serait une condamnation definitive.
+ */
+export async function republierTitre(trackId) {
+  await execute("UPDATE tracks SET published = TRUE WHERE id = $1", [trackId]);
+}
+
+/**
+ * Comptes du site, pour l'administration.
+ *
+ * L'adresse est montree : elle est le seul moyen de reconnaitre un compte
+ * signale. Le hachage du mot de passe ne sort jamais de la base.
+ */
+export async function listeComptes(limite = 60) {
+  return query(
+    `SELECT u.id, u.name, u.email, u.role, u.created_at,
+            a.id AS artist_id, a.name AS artiste, a.verified
+       FROM users u
+       LEFT JOIN artists a ON a.user_id = u.id
+      ORDER BY u.created_at DESC
+      LIMIT $1`,
+    [limite],
+  );
+}
+
 export async function derniersTitres(limite = 40) {
   return query(
     `SELECT t.id, t.title, t.kind, t.published, t.created_at, a.name AS artiste, a.slug

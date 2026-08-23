@@ -1,7 +1,6 @@
 import { query } from "@/lib/db";
-import { currentUser } from "@/lib/auth";
 import { toPublicTrack } from "@/lib/repo/tracks";
-import { fail, json } from "@/lib/http";
+import { json } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,10 +10,6 @@ export const dynamic = "force-dynamic";
  * autorise l'usage en mix.
  */
 export async function GET(request) {
-  // Meme regle que la page : la platine se tient avec un compte.
-  const user = await currentUser();
-  if (!user) return fail("Connectez-vous pour ouvrir la platine.", 401);
-
   const recherche = new URL(request.url).searchParams.get("q") || "";
   const terme = recherche.trim();
 

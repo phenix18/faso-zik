@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { HiMagnifyingGlass, HiSpeakerWave } from "react-icons/hi2";
 import Deck from "@/components/dj/Deck";
+import YouTubePanneau from "@/components/dj/YouTubePanneau";
 import useDeck from "@/components/dj/useDeck";
 import Cover from "@/components/Cover";
 import { formatDuration } from "@/lib/format";
@@ -168,6 +169,8 @@ export default function DjConsole({ tracks }) {
           </div>
         </div>
       </section>
+
+      <YouTubePanneau />
 
       <section className="card" aria-label="Bac a disques">
         <div className="mb-3 flex flex-wrap items-center gap-3">
