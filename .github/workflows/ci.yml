@@ -38,8 +38,10 @@ jobs:
       - name: Tests
         run: npm test
 
+      # Volontairement sans variable d'environnement : c'est ainsi que
+      # construit un hebergeur avant qu'on ne les ait renseignees. Poser
+      # NEXTAUTH_URL ici avait masque une panne jusqu'au premier deploiement.
       - name: Build de production
         run: npm run build
         env:
-          NEXTAUTH_SECRET: secret-de-controle-continu
-          NEXTAUTH_URL: http://localhost:3000
+          VERCEL_URL: "" # Vercel la laisse vide pendant la construction
